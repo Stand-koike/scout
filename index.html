@@ -19,7 +19,7 @@
         .info-bar {
             position: absolute; top: 0; left: 0; width: 100%;
             background: rgba(255,255,255,0.9); padding: 10px 15px;
-            padding-top: env(safe-area-inset-top, 10px); /* ノッチ対応 */
+            padding-top: env(safe-area-inset-top, 10px);
             z-index: 5; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             display: flex; justify-content: space-between; align-items: center;
             box-sizing: border-box; backdrop-filter: blur(5px);
@@ -35,7 +35,7 @@
             box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
             z-index: 20; 
             backdrop-filter: blur(5px);
-            padding-bottom: env(safe-area-inset-bottom, 0); /* iPhone X系対応 */
+            padding-bottom: env(safe-area-inset-bottom, 0);
             box-sizing: content-box;
         }
 
@@ -51,8 +51,7 @@
 
         /* 中央のメインボタン（スキャン） */
         .scan-btn-wrapper {
-            position: relative; top: -25px; /* 上にはみ出させる */
-            height: 0; display: flex; align-items: center;
+            position: relative; top: -25px; height: 0; display: flex; align-items: center;
         }
         .scan-btn {
             width: 60px; height: 60px; border-radius: 50%;
@@ -64,6 +63,9 @@
             -webkit-tap-highlight-color: transparent;
         }
         .scan-btn:active { transform: scale(0.95); background: #219150; }
+
+        /* ファイル入力 (非表示) */
+        #file-input { display: none; }
 
         /* カメラモーダル */
         #scan-modal {
@@ -88,10 +90,10 @@
             cursor: pointer; z-index: 2001;
         }
 
-        /* 属性表示ポップアップ (Bottom Sheet) */
+        /* 属性表示ポップアップ */
         #feature-info {
             position: fixed; bottom: -60%; left: 0; width: 100%; height: 50%;
-            background: white; z-index: 100; /* ナビより上 */
+            background: white; z-index: 100;
             border-top-left-radius: 20px; border-top-right-radius: 20px;
             box-shadow: 0 -5px 20px rgba(0,0,0,0.2);
             transition: bottom 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
@@ -104,7 +106,7 @@
             background: #f8f9fa; border-top-left-radius: 20px; border-top-right-radius: 20px;
             color: #2c3e50;
         }
-        .info-content { flex: 1; overflow-y: auto; padding: 15px; padding-bottom: 80px; /* ボトムバー考慮 */ }
+        .info-content { flex: 1; overflow-y: auto; padding: 15px; padding-bottom: 80px; }
         table { width: 100%; border-collapse: collapse; font-size: 14px; }
         th, td { padding: 10px 5px; border-bottom: 1px solid #eee; text-align: left; }
         th { color: #7f8c8d; width: 35%; font-weight: normal; font-size: 12px; }
@@ -125,9 +127,9 @@
 
 <!-- ボトムナビゲーション -->
 <div class="bottom-nav">
-    <button class="nav-btn" onclick="toggleMapType()" title="地図切替">
-        <i class="fas fa-layer-group"></i>
-        <span>地図切替</span>
+    <button class="nav-btn" onclick="document.getElementById('file-input').click()" title="ファイル読込">
+        <i class="fas fa-folder-open"></i>
+        <span>ファイル</span>
     </button>
     
     <div class="scan-btn-wrapper">
@@ -141,6 +143,9 @@
         <span>現在地</span>
     </button>
 </div>
+
+<!-- ファイル入力 (隠し要素) -->
+<input type="file" id="file-input" accept=".zip,.geojson,.json,.kml">
 
 <!-- QRスキャン画面 -->
 <div id="scan-modal">
@@ -164,10 +169,10 @@
 
 <!-- Libraries -->
 <script src="https://cdn.jsdelivr.net/npm/openlayers@4.6.5/dist/ol.js"></script>
-<!-- jsQR: QRコード読み取り -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-<!-- LZString: データ解凍 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+<!-- shpjs: Zip読み込み用 -->
+<script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
 
 <script>
     // --- 初期化 ---
@@ -186,32 +191,93 @@
         })
     });
 
-    // GPSマーカーレイヤー
     const gpsSource = new ol.source.Vector();
     const gpsLayer = new ol.layer.Vector({
         source: gpsSource,
         zIndex: 999,
         style: new ol.style.Style({
-            image: new ol.style.Circle({
-                radius: 8,
-                fill: new ol.style.Fill({color: '#3498db'}),
-                stroke: new ol.style.Stroke({color: '#fff', width: 3})
-            })
+            image: new ol.style.Circle({ radius: 8, fill: new ol.style.Fill({color: '#3498db'}), stroke: new ol.style.Stroke({color: '#fff', width: 3}) })
         })
     });
 
     const map = new ol.Map({
         target: 'map',
-        controls: ol.control.defaults({ attribution: false, zoom: false }), // モバイル向けにコントロール最小化
+        controls: ol.control.defaults({ attribution: false, zoom: false }),
         layers: [ baseLayers.std, baseLayers.photo, vectorLayer, gpsLayer ],
         view: new ol.View({ center: ol.proj.fromLonLat([138, 36]), zoom: 6 })
     });
 
-    // --- 地図操作 ---
     function toggleMapType() {
         const isStd = baseLayers.std.getVisible();
         baseLayers.std.setVisible(!isStd);
         baseLayers.photo.setVisible(isStd);
+    }
+
+    // --- ファイル読み込み処理 ---
+    document.getElementById('file-input').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        document.getElementById('loading').style.display = 'block';
+        
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+            try {
+                if (file.name.match(/\.zip$/i)) {
+                    // shpjsでZIP解析
+                    shp(ev.target.result).then(geojson => {
+                        addGeoJSONFeatures(geojson);
+                        document.getElementById('loading').style.display = 'none';
+                    }).catch(err => {
+                        throw new Error("ZIP解析失敗: " + err);
+                    });
+                } else if (file.name.match(/\.json$|\.geojson$/i)) {
+                    const json = JSON.parse(ev.target.result);
+                    addGeoJSONFeatures(json);
+                    document.getElementById('loading').style.display = 'none';
+                } else if (file.name.match(/\.kml$/i)) {
+                    // KML解析
+                    const features = new ol.format.KML({extractStyles:false}).readFeatures(ev.target.result, {featureProjection:'EPSG:3857'});
+                    if (features.length > 0) {
+                        vectorSource.addFeatures(features);
+                        map.getView().fit(vectorSource.getExtent(), { padding: [50, 50, 50, 50], duration: 1000 });
+                        updateStatus(features.length);
+                    }
+                    document.getElementById('loading').style.display = 'none';
+                } else {
+                    alert("未対応のファイル形式です");
+                    document.getElementById('loading').style.display = 'none';
+                }
+            } catch (err) {
+                alert("読み込みエラー: " + err.message);
+                document.getElementById('loading').style.display = 'none';
+            }
+        };
+
+        if (file.name.match(/\.zip$/i)) {
+            reader.readAsArrayBuffer(file);
+        } else {
+            reader.readAsText(file);
+        }
+        
+        // ファイル入力をリセット（同じファイルを再度選べるように）
+        this.value = '';
+    });
+
+    function addGeoJSONFeatures(json) {
+        const features = new ol.format.GeoJSON().readFeatures(json, { featureProjection: 'EPSG:3857' });
+        if (features.length > 0) {
+            vectorSource.addFeatures(features);
+            map.getView().fit(vectorSource.getExtent(), { padding: [50, 50, 50, 50], duration: 1000 });
+            updateStatus(features.length);
+            alert(`${features.length}件のデータを読み込みました`);
+        } else {
+            alert("有効な地物がありません");
+        }
+    }
+
+    function updateStatus(count) {
+        document.getElementById('layer-count').textContent = `地物数: ${vectorSource.getFeatures().length}`;
     }
 
     // --- QRスキャンロジック ---
@@ -219,99 +285,50 @@
     const canvas = document.getElementById('scan-canvas');
     const ctx = canvas.getContext('2d');
     let animationFrameId = null;
-
-    // 分割データバッファ
     let qrBuffer = { total: 0, parts: [] };
 
     function startScan() {
-        // カメラ使用にはHTTPSまたはlocalhost必須
         if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-            alert("カメラを使用するにはHTTPS環境が必要です。\n(GitHub Pagesなどにアップロードしてください)");
-            return;
+            alert("カメラにはHTTPSが必要です"); return;
         }
-
         document.getElementById('scan-modal').style.display = 'flex';
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(function(stream) {
-            video.srcObject = stream;
-            video.setAttribute("playsinline", true); // iOS対応
-            video.play();
-            requestAnimationFrame(tick);
-        }).catch(err => {
-            alert("カメラの起動に失敗しました: " + err);
-            stopScan();
-        });
+            video.srcObject = stream; video.setAttribute("playsinline", true); video.play(); requestAnimationFrame(tick);
+        }).catch(err => { alert("カメラ起動失敗: " + err); stopScan(); });
     }
 
     function stopScan() {
         document.getElementById('scan-modal').style.display = 'none';
-        if(video.srcObject) {
-            video.srcObject.getTracks().forEach(track => track.stop());
-            video.srcObject = null;
-        }
+        if(video.srcObject) { video.srcObject.getTracks().forEach(track => track.stop()); video.srcObject = null; }
         if(animationFrameId) cancelAnimationFrame(animationFrameId);
     }
 
     function tick() {
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            canvas.height = video.videoHeight;
-            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight; canvas.width = video.videoWidth;
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-
-            if (code) {
-                // QR発見 (少し待機して連続読み込み防止)
-                stopScan();
-                handleScannedData(code.data);
-                return;
-            }
+            if (code) { stopScan(); handleScannedData(code.data); return; }
         }
         animationFrameId = requestAnimationFrame(tick);
     }
 
     function handleScannedData(data) {
-        // 分割データの判定: "FGS:{index}/{total}:{chunk}"
         const match = data.match(/^FGS:(\d+)\/(\d+):(.*)$/);
-        
         if (match) {
-            const index = parseInt(match[1]);
-            const total = parseInt(match[2]);
-            const chunk = match[3];
-
-            if (qrBuffer.total === 0) {
-                // 初回読み込み
-                qrBuffer.total = total;
-                qrBuffer.parts = new Array(total).fill(null);
-                alert(`分割データ(${total}枚)を検知しました。\n1枚目を読み取りました。`);
-            } else if (qrBuffer.total !== total) {
-                alert("異なるデータのQRコードが混ざっています。リセットします。");
-                qrBuffer = { total: 0, parts: [] };
-                return;
-            }
+            const index = parseInt(match[1]); const total = parseInt(match[2]); const chunk = match[3];
+            if (qrBuffer.total === 0) { qrBuffer.total = total; qrBuffer.parts = new Array(total).fill(null); alert(`分割データ(${total}枚)を検知。1枚目を読込完了。`); } 
+            else if (qrBuffer.total !== total) { alert("データ不一致。リセットします。"); qrBuffer = { total: 0, parts: [] }; return; }
 
             if (qrBuffer.parts[index - 1] === null) {
                 qrBuffer.parts[index - 1] = chunk;
                 const receivedCount = qrBuffer.parts.filter(p => p !== null).length;
-                
-                if (receivedCount === total) {
-                    // 全データ受信完了 -> 結合して処理
-                    const fullData = qrBuffer.parts.join("");
-                    processGeoJSON(fullData);
-                    qrBuffer = { total: 0, parts: [] }; // リセット
-                } else {
-                    alert(`${index} / ${total} 枚目を読み取りました。\n残り ${total - receivedCount} 枚です。`);
-                    // 連続読み取りのため再開
-                    startScan(); 
-                }
-            } else {
-                alert(`このQRコード(${index}/${total})は既に読み取っています。`);
-                startScan();
-            }
+                if (receivedCount === total) { processGeoJSON(qrBuffer.parts.join("")); qrBuffer = { total: 0, parts: [] }; } 
+                else { alert(`${index}/${total} 読込完了。残り${total - receivedCount}枚。`); startScan(); }
+            } else { alert(`このQR(${index}/${total})は読込済みです。`); startScan(); }
             return;
         }
-
-        // 通常データ (分割なし)
         processGeoJSON(data);
     }
 
@@ -319,69 +336,29 @@
         document.getElementById('loading').style.display = 'block';
         setTimeout(() => {
             try {
-                // 1. LZStringで解凍
                 const decompressed = LZString.decompressFromBase64(data);
-                if (!decompressed) throw new Error("データの解凍に失敗しました");
-
-                // 2. GeoJSONパース
-                const json = JSON.parse(decompressed);
-                const features = new ol.format.GeoJSON().readFeatures(json, {
-                    featureProjection: 'EPSG:3857'
-                });
-
-                if (features.length === 0) throw new Error("有効なデータが含まれていません");
-
-                // 3. 地図に追加
-                vectorSource.addFeatures(features);
-                
-                // 4. ズーム
-                map.getView().fit(vectorSource.getExtent(), { padding: [50, 50, 50, 50], duration: 1000 });
-                
-                document.getElementById('layer-count').textContent = `地物数: ${vectorSource.getFeatures().length}`;
-                alert(`${features.length}件のデータを読み込みました`);
-
-            } catch (e) {
-                alert("読み込みエラー: " + e.message + "\n\n(データが壊れているか、対応していない形式です)");
-                console.error(e);
-            } finally {
-                document.getElementById('loading').style.display = 'none';
-            }
+                if (!decompressed) throw new Error("解凍失敗");
+                addGeoJSONFeatures(JSON.parse(decompressed));
+            } catch (e) { alert("読込エラー: " + e.message); console.error(e); } 
+            finally { document.getElementById('loading').style.display = 'none'; }
         }, 100);
     }
 
     // --- GPSロジック ---
     let watchId = null;
-    
     function toggleGPS() {
         const btn = document.getElementById('gps-btn');
-        if (watchId) {
-            // 停止
-            navigator.geolocation.clearWatch(watchId);
-            watchId = null;
-            btn.classList.remove('active');
-            gpsSource.clear();
-        } else {
-            // 開始
-            if (!navigator.geolocation) { alert("GPS非対応のブラウザです"); return; }
-            
+        if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; btn.classList.remove('active'); gpsSource.clear(); } 
+        else {
+            if (!navigator.geolocation) { alert("GPS非対応"); return; }
             btn.classList.add('active');
             watchId = navigator.geolocation.watchPosition(
                 (pos) => {
-                    const coords = [pos.coords.longitude, pos.coords.latitude];
-                    const xy = ol.proj.fromLonLat(coords);
-                    
-                    const feature = new ol.Feature(new ol.geom.Point(xy));
-                    gpsSource.clear();
-                    gpsSource.addFeature(feature);
-                    
-                    // 初回のみズーム、あるいは追従モードがあれば追従
-                    // 今回はシンプルに現在地更新のみ
+                    const xy = ol.proj.fromLonLat([pos.coords.longitude, pos.coords.latitude]);
+                    gpsSource.clear(); gpsSource.addFeature(new ol.Feature(new ol.geom.Point(xy)));
                 },
-                (err) => { alert("GPSエラー: " + err.message); toggleGPS(); },
-                { enableHighAccuracy: true }
+                (err) => { alert("GPSエラー: " + err.message); toggleGPS(); }, { enableHighAccuracy: true }
             );
-            
-            // 初回位置取得へジャンプ
             navigator.geolocation.getCurrentPosition(pos => {
                 const xy = ol.proj.fromLonLat([pos.coords.longitude, pos.coords.latitude]);
                 map.getView().animate({ center: xy, zoom: 16, duration: 1000 });
@@ -389,34 +366,21 @@
         }
     }
 
-    // --- 地物クリック (属性表示) ---
+    // --- 地物クリック ---
     map.on('click', function(e) {
         const pixel = map.getEventPixel(e.originalEvent);
         const feature = map.forEachFeatureAtPixel(pixel, f => f, { hitTolerance: 10 });
-        
-        if (feature && feature !== gpsSource.getFeatures()[0]) {
-            showFeatureInfo(feature);
-        } else {
-            closeInfo();
-        }
+        if (feature && feature !== gpsSource.getFeatures()[0]) showFeatureInfo(feature); else closeInfo();
     });
 
     function showFeatureInfo(feature) {
         const props = feature.getProperties();
         let html = '<table>';
-        Object.keys(props).forEach(k => {
-            if (k !== 'geometry' && k !== 'style') {
-                html += `<tr><th>${k}</th><td>${props[k]}</td></tr>`;
-            }
-        });
+        Object.keys(props).forEach(k => { if (k !== 'geometry' && k !== 'style') html += `<tr><th>${k}</th><td>${props[k]}</td></tr>`; });
         html += '</table>';
-        document.getElementById('info-table').innerHTML = html;
-        document.getElementById('feature-info').classList.add('open');
+        document.getElementById('info-table').innerHTML = html; document.getElementById('feature-info').classList.add('open');
     }
-
-    function closeInfo() {
-        document.getElementById('feature-info').classList.remove('open');
-    }
+    function closeInfo() { document.getElementById('feature-info').classList.remove('open'); }
 </script>
 </body>
 </html>
