@@ -31,7 +31,7 @@
         .bottom-nav {
             position: absolute; bottom: 0; left: 0; width: 100%; height: 70px;
             background: rgba(255,255,255,0.95);
-            display: flex; justify-content: space-evenly; /* 均等配置 */
+            display: flex; justify-content: space-evenly;
             align-items: center;
             box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
             z-index: 20; 
@@ -53,7 +53,7 @@
 
         /* 中央のメインボタン（スキャン） */
         .scan-btn-wrapper {
-            position: relative; top: -20px; /* 少し上に */
+            position: relative; top: -20px;
             height: 0; display: flex; align-items: center; justify-content: center;
             width: 60px;
         }
@@ -76,16 +76,33 @@
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 2000; flex-direction: column;
         }
-        #scan-video { width: 100%; flex: 1; object-fit: cover; }
-        #scan-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            border: 50px solid rgba(0,0,0,0.5); box-sizing: border-box;
+        #scan-video { width: 100%; height: 100%; object-fit: cover; }
+        #scan-canvas { display: none; }
+        
+        /* スキャンガイド枠 */
+        #scan-guide {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 70%; aspect-ratio: 1/1;
+            border: 2px solid #27ae60; border-radius: 20px;
+            box-shadow: 0 0 0 9999px rgba(0,0,0,0.5); /* 周りを暗く */
             pointer-events: none;
         }
+        #scan-guide::after {
+            content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 2px;
+            background: #27ae60; box-shadow: 0 0 4px #27ae60;
+            animation: scan-anim 2s infinite linear;
+        }
+        @keyframes scan-anim {
+            0% { top: 0; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+
         .scan-msg {
             position: absolute; top: 10%; left: 0; width: 100%;
             text-align: center; color: white; font-weight: bold; text-shadow: 0 1px 3px #000;
-            pointer-events: none;
+            pointer-events: none; z-index: 2002;
         }
         .close-scan {
             position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%);
@@ -129,7 +146,7 @@
 
 <div id="map"></div>
 
-<!-- ボトムナビゲーション (4ボタン構成) -->
+<!-- ボトムナビゲーション -->
 <div class="bottom-nav">
     <button class="nav-btn" onclick="document.getElementById('file-input').click()" title="ファイル読込">
         <i class="fas fa-folder-open"></i>
@@ -153,15 +170,14 @@
     </button>
 </div>
 
-<!-- ファイル入力 (隠し要素) -->
 <input type="file" id="file-input" accept=".zip,.geojson,.json,.kml">
 
 <!-- QRスキャン画面 -->
 <div id="scan-modal">
     <div class="scan-msg">QRコードを枠内に入れてください</div>
     <video id="scan-video" playsinline></video>
-    <canvas id="scan-canvas" style="display:none;"></canvas>
-    <div id="scan-overlay"></div>
+    <canvas id="scan-canvas"></canvas>
+    <div id="scan-guide"></div>
     <button class="close-scan" onclick="stopScan()">閉じる</button>
 </div>
 
@@ -180,7 +196,6 @@
 <script src="https://cdn.jsdelivr.net/npm/openlayers@4.6.5/dist/ol.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
-<!-- shpjs: Zip読み込み用 -->
 <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
 
 <script>
@@ -233,19 +248,15 @@
         reader.onload = function(ev) {
             try {
                 if (file.name.match(/\.zip$/i)) {
-                    // shpjsでZIP解析
                     shp(ev.target.result).then(geojson => {
                         addGeoJSONFeatures(geojson);
                         document.getElementById('loading').style.display = 'none';
-                    }).catch(err => {
-                        throw new Error("ZIP解析失敗: " + err);
-                    });
+                    }).catch(err => { throw new Error("ZIP解析失敗: " + err); });
                 } else if (file.name.match(/\.json$|\.geojson$/i)) {
                     const json = JSON.parse(ev.target.result);
                     addGeoJSONFeatures(json);
                     document.getElementById('loading').style.display = 'none';
                 } else if (file.name.match(/\.kml$/i)) {
-                    // KML解析
                     const features = new ol.format.KML({extractStyles:false}).readFeatures(ev.target.result, {featureProjection:'EPSG:3857'});
                     if (features.length > 0) {
                         vectorSource.addFeatures(features);
@@ -263,13 +274,8 @@
             }
         };
 
-        if (file.name.match(/\.zip$/i)) {
-            reader.readAsArrayBuffer(file);
-        } else {
-            reader.readAsText(file);
-        }
-        
-        // ファイル入力をリセット（同じファイルを再度選べるように）
+        if (file.name.match(/\.zip$/i)) { reader.readAsArrayBuffer(file); } 
+        else { reader.readAsText(file); }
         this.value = '';
     });
 
@@ -280,16 +286,14 @@
             map.getView().fit(vectorSource.getExtent(), { padding: [50, 50, 50, 50], duration: 1000 });
             updateStatus(features.length);
             alert(`${features.length}件のデータを読み込みました`);
-        } else {
-            alert("有効な地物がありません");
-        }
+        } else { alert("有効な地物がありません"); }
     }
 
     function updateStatus(count) {
         document.getElementById('layer-count').textContent = `地物数: ${vectorSource.getFeatures().length}`;
     }
 
-    // --- QRスキャンロジック ---
+    // --- QRスキャンロジック (改善版) ---
     const video = document.getElementById('scan-video');
     const canvas = document.getElementById('scan-canvas');
     const ctx = canvas.getContext('2d');
@@ -301,9 +305,25 @@
             alert("カメラにはHTTPSが必要です"); return;
         }
         document.getElementById('scan-modal').style.display = 'flex';
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(function(stream) {
-            video.srcObject = stream; video.setAttribute("playsinline", true); video.play(); requestAnimationFrame(tick);
-        }).catch(err => { alert("カメラ起動失敗: " + err); stopScan(); });
+        
+        // パフォーマンス重視の設定: 解像度を抑える
+        const constraints = {
+            video: {
+                facingMode: "environment",
+                width: { ideal: 640 }, // 高画素になりすぎないよう制限
+                height: { ideal: 480 }
+            }
+        };
+
+        navigator.mediaDevices.getUserMedia(constraints).then(function(stream) {
+            video.srcObject = stream;
+            video.setAttribute("playsinline", true);
+            video.play();
+            requestAnimationFrame(tick);
+        }).catch(err => {
+            alert("カメラ起動失敗: " + err);
+            stopScan();
+        });
     }
 
     function stopScan() {
@@ -314,11 +334,20 @@
 
     function tick() {
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            canvas.height = video.videoHeight; canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.width = video.videoWidth;
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-            if (code) { stopScan(); handleScannedData(code.data); return; }
+
+            if (code) {
+                // 読み取り成功時のフィードバック
+                if (navigator.vibrate) navigator.vibrate(200); // 200ms振動
+                stopScan();
+                handleScannedData(code.data);
+                return;
+            }
         }
         animationFrameId = requestAnimationFrame(tick);
     }
@@ -334,8 +363,14 @@
                 qrBuffer.parts[index - 1] = chunk;
                 const receivedCount = qrBuffer.parts.filter(p => p !== null).length;
                 if (receivedCount === total) { processGeoJSON(qrBuffer.parts.join("")); qrBuffer = { total: 0, parts: [] }; } 
-                else { alert(`${index}/${total} 読込完了。残り${total - receivedCount}枚。`); startScan(); }
-            } else { alert(`このQR(${index}/${total})は読込済みです。`); startScan(); }
+                else { 
+                    alert(`${index}/${total} 読込完了。\n残り${total - receivedCount}枚。\nOKを押して次をスキャンしてください。`); 
+                    startScan(); // 連続スキャン
+                }
+            } else { 
+                alert(`このQR(${index}/${total})は読込済みです。\n別のQRをスキャンしてください。`); 
+                startScan(); 
+            }
             return;
         }
         processGeoJSON(data);
