@@ -83,15 +83,26 @@
         #scan-guide {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 70%; aspect-ratio: 1/1;
-            border: 2px solid #27ae60; border-radius: 20px;
-            box-shadow: 0 0 0 9999px rgba(0,0,0,0.5); /* 周りを暗く */
+            border: 4px solid #3498db; border-radius: 20px;
+            box-shadow: 0 0 0 9999px rgba(0,0,0,0.6); /* 周りを暗く */
             pointer-events: none;
+            transition: border-color 0.2s, transform 0.2s;
         }
+        /* 読み取り成功時のスタイル */
+        #scan-guide.success {
+            border-color: #2ecc71;
+            transform: translate(-50%, -50%) scale(1.05);
+            box-shadow: 0 0 20px #2ecc71, 0 0 0 9999px rgba(0,0,0,0.6);
+        }
+
+        /* スキャンラインアニメーション */
         #scan-guide::after {
             content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 2px;
-            background: #27ae60; box-shadow: 0 0 4px #27ae60;
+            background: #3498db; box-shadow: 0 0 4px #3498db;
             animation: scan-anim 2s infinite linear;
         }
+        #scan-guide.success::after { display: none; }
+
         @keyframes scan-anim {
             0% { top: 0; opacity: 0; }
             10% { opacity: 1; }
@@ -297,6 +308,7 @@
     const video = document.getElementById('scan-video');
     const canvas = document.getElementById('scan-canvas');
     const ctx = canvas.getContext('2d');
+    const scanGuide = document.getElementById('scan-guide');
     let animationFrameId = null;
     let qrBuffer = { total: 0, parts: [] };
 
@@ -305,13 +317,13 @@
             alert("カメラにはHTTPSが必要です"); return;
         }
         document.getElementById('scan-modal').style.display = 'flex';
+        scanGuide.classList.remove('success'); // ガイドリセット
         
-        // パフォーマンス重視の設定: 解像度を抑える
+        // 修正: 解像度を上げて細かいQRに対応
         const constraints = {
             video: {
                 facingMode: "environment",
-                width: { ideal: 640 }, // 高画素になりすぎないよう制限
-                height: { ideal: 480 }
+                width: { ideal: 1280 } 
             }
         };
 
@@ -342,10 +354,15 @@
             const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
 
             if (code) {
-                // 読み取り成功時のフィードバック
-                if (navigator.vibrate) navigator.vibrate(200); // 200ms振動
-                stopScan();
-                handleScannedData(code.data);
+                // 成功フィードバック (緑枠 + バイブ)
+                scanGuide.classList.add('success');
+                if (navigator.vibrate) navigator.vibrate(200);
+                
+                // 少し待ってから処理 (フィードバックを見せるため)
+                setTimeout(() => {
+                    stopScan();
+                    handleScannedData(code.data);
+                }, 300);
                 return;
             }
         }
