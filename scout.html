@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Forestry Scout</title>
+    
+    <!-- OpenLayers 4.6.5 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/openlayers@4.6.5/dist/ol.css">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #eee; overflow: hidden; }
+        
+        #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+
+        /* ヘッダー情報 */
+        .info-bar {
+            position: absolute; top: 0; left: 0; width: 100%;
+            background: rgba(255,255,255,0.9); padding: 10px 15px;
+            padding-top: env(safe-area-inset-top, 10px); /* ノッチ対応 */
+            z-index: 5; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex; justify-content: space-between; align-items: center;
+            box-sizing: border-box; backdrop-filter: blur(5px);
+        }
+        .app-title { font-weight: bold; font-size: 16px; color: #2c3e50; display: flex; align-items: center; gap: 8px; }
+        .layer-status { font-size: 12px; color: #666; }
+
+        /* ボトムナビゲーション */
+        .bottom-nav {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 70px;
+            background: rgba(255,255,255,0.95);
+            display: flex; justify-content: space-around; align-items: center;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            z-index: 20; 
+            backdrop-filter: blur(5px);
+            padding-bottom: env(safe-area-inset-bottom, 0); /* iPhone X系対応 */
+            box-sizing: content-box;
+        }
+
+        .nav-btn {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            border: none; background: none; color: #7f8c8d;
+            font-size: 10px; gap: 4px; cursor: pointer; width: 60px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .nav-btn i { font-size: 20px; margin-bottom: 2px; transition: color 0.2s; }
+        .nav-btn.active { color: #3498db; }
+        .nav-btn.active i { color: #3498db; }
+
+        /* 中央のメインボタン（スキャン） */
+        .scan-btn-wrapper {
+            position: relative; top: -25px; /* 上にはみ出させる */
+            height: 0; display: flex; align-items: center;
+        }
+        .scan-btn {
+            width: 60px; height: 60px; border-radius: 50%;
+            background: #27ae60; color: white;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 26px; border: 4px solid #f5f5f5;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .scan-btn:active { transform: scale(0.95); background: #219150; }
+
+        /* カメラモーダル */
+        #scan-modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 2000; flex-direction: column;
+        }
+        #scan-video { width: 100%; flex: 1; object-fit: cover; }
+        #scan-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            border: 50px solid rgba(0,0,0,0.5); box-sizing: border-box;
+            pointer-events: none;
+        }
+        .scan-msg {
+            position: absolute; top: 10%; left: 0; width: 100%;
+            text-align: center; color: white; font-weight: bold; text-shadow: 0 1px 3px #000;
+            pointer-events: none;
+        }
+        .close-scan {
+            position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%);
+            padding: 10px 30px; background: rgba(255,255,255,0.2); border: 2px solid white;
+            color: white; border-radius: 30px; font-weight: bold; font-size: 16px;
+            cursor: pointer; z-index: 2001;
+        }
+
+        /* 属性表示ポップアップ (Bottom Sheet) */
+        #feature-info {
+            position: fixed; bottom: -60%; left: 0; width: 100%; height: 50%;
+            background: white; z-index: 100; /* ナビより上 */
+            border-top-left-radius: 20px; border-top-right-radius: 20px;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.2);
+            transition: bottom 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            display: flex; flex-direction: column;
+        }
+        #feature-info.open { bottom: 0; }
+        .info-header {
+            padding: 15px 20px; border-bottom: 1px solid #eee; font-weight: bold;
+            display: flex; justify-content: space-between; align-items: center;
+            background: #f8f9fa; border-top-left-radius: 20px; border-top-right-radius: 20px;
+            color: #2c3e50;
+        }
+        .info-content { flex: 1; overflow-y: auto; padding: 15px; padding-bottom: 80px; /* ボトムバー考慮 */ }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th, td { padding: 10px 5px; border-bottom: 1px solid #eee; text-align: left; }
+        th { color: #7f8c8d; width: 35%; font-weight: normal; font-size: 12px; }
+        td { color: #2c3e50; font-weight: 500; }
+
+        /* 読み込み中表示 */
+        #loading { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.7); color:white; padding:15px; border-radius:5px; z-index:9999; }
+    </style>
+</head>
+<body>
+
+<div class="info-bar">
+    <div class="app-title"><i class="fas fa-tree"></i> Forestry Scout</div>
+    <div class="layer-status" id="layer-count">データなし</div>
+</div>
+
+<div id="map"></div>
+
+<!-- ボトムナビゲーション -->
+<div class="bottom-nav">
+    <button class="nav-btn" onclick="toggleMapType()" title="地図切替">
+        <i class="fas fa-layer-group"></i>
+        <span>地図切替</span>
+    </button>
+    
+    <div class="scan-btn-wrapper">
+        <button class="scan-btn" onclick="startScan()" title="QR読込">
+            <i class="fas fa-qrcode"></i>
+        </button>
+    </div>
+
+    <button class="nav-btn" id="gps-btn" onclick="toggleGPS()" title="現在地">
+        <i class="fas fa-location-arrow"></i>
+        <span>現在地</span>
+    </button>
+</div>
+
+<!-- QRスキャン画面 -->
+<div id="scan-modal">
+    <div class="scan-msg">QRコードを枠内に入れてください</div>
+    <video id="scan-video" playsinline></video>
+    <canvas id="scan-canvas" style="display:none;"></canvas>
+    <div id="scan-overlay"></div>
+    <button class="close-scan" onclick="stopScan()">閉じる</button>
+</div>
+
+<!-- 属性情報パネル -->
+<div id="feature-info">
+    <div class="info-header">
+        <span><i class="fas fa-info-circle"></i> 地物情報</span>
+        <i class="fas fa-times" onclick="closeInfo()" style="padding:5px 10px; cursor:pointer; font-size:18px; color:#95a5a6;"></i>
+    </div>
+    <div class="info-content" id="info-table"></div>
+</div>
+
+<div id="loading"><i class="fas fa-spinner fa-spin"></i> 処理中...</div>
+
+<!-- Libraries -->
+<script src="https://cdn.jsdelivr.net/npm/openlayers@4.6.5/dist/ol.js"></script>
+<!-- jsQR: QRコード読み取り -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<!-- LZString: データ解凍 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+
+<script>
+    // --- 初期化 ---
+    const baseLayers = {
+        std: new ol.layer.Tile({ source: new ol.source.XYZ({ url: "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png", attributions: "地理院", crossOrigin: 'anonymous' }), visible: true }),
+        photo: new ol.layer.Tile({ source: new ol.source.XYZ({ url: "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg", attributions: "地理院", crossOrigin: 'anonymous' }), visible: false })
+    };
+
+    const vectorSource = new ol.source.Vector();
+    const vectorLayer = new ol.layer.Vector({
+        source: vectorSource,
+        style: new ol.style.Style({
+            fill: new ol.style.Fill({ color: 'rgba(231, 76, 60, 0.4)' }),
+            stroke: new ol.style.Stroke({ color: '#c0392b', width: 2 }),
+            image: new ol.style.Circle({ radius: 6, fill: new ol.style.Fill({color: '#e74c3c'}), stroke: new ol.style.Stroke({color:'#fff', width:2}) })
+        })
+    });
+
+    // GPSマーカーレイヤー
+    const gpsSource = new ol.source.Vector();
+    const gpsLayer = new ol.layer.Vector({
+        source: gpsSource,
+        zIndex: 999,
+        style: new ol.style.Style({
+            image: new ol.style.Circle({
+                radius: 8,
+                fill: new ol.style.Fill({color: '#3498db'}),
+                stroke: new ol.style.Stroke({color: '#fff', width: 3})
+            })
+        })
+    });
+
+    const map = new ol.Map({
+        target: 'map',
+        controls: ol.control.defaults({ attribution: false, zoom: false }), // モバイル向けにコントロール最小化
+        layers: [ baseLayers.std, baseLayers.photo, vectorLayer, gpsLayer ],
+        view: new ol.View({ center: ol.proj.fromLonLat([138, 36]), zoom: 6 })
+    });
+
+    // --- 地図操作 ---
+    function toggleMapType() {
+        const isStd = baseLayers.std.getVisible();
+        baseLayers.std.setVisible(!isStd);
+        baseLayers.photo.setVisible(isStd);
+    }
+
+    // --- QRスキャンロジック ---
+    const video = document.getElementById('scan-video');
+    const canvas = document.getElementById('scan-canvas');
+    const ctx = canvas.getContext('2d');
+    let animationFrameId = null;
+
+    function startScan() {
+        // カメラ使用にはHTTPSまたはlocalhost必須
+        if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+            alert("カメラを使用するにはHTTPS環境が必要です。\n(GitHub Pagesなどにアップロードしてください)");
+            return;
+        }
+
+        document.getElementById('scan-modal').style.display = 'flex';
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(function(stream) {
+            video.srcObject = stream;
+            video.setAttribute("playsinline", true); // iOS対応
+            video.play();
+            requestAnimationFrame(tick);
+        }).catch(err => {
+            alert("カメラの起動に失敗しました: " + err);
+            stopScan();
+        });
+    }
+
+    function stopScan() {
+        document.getElementById('scan-modal').style.display = 'none';
+        if(video.srcObject) {
+            video.srcObject.getTracks().forEach(track => track.stop());
+            video.srcObject = null;
+        }
+        if(animationFrameId) cancelAnimationFrame(animationFrameId);
+    }
+
+    function tick() {
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.height = video.videoHeight;
+            canvas.width = video.videoWidth;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+
+            if (code) {
+                // QR発見
+                handleScannedData(code.data);
+                stopScan();
+                return;
+            }
+        }
+        animationFrameId = requestAnimationFrame(tick);
+    }
+
+    function handleScannedData(data) {
+        document.getElementById('loading').style.display = 'block';
+        setTimeout(() => {
+            try {
+                // 1. LZStringで解凍
+                const decompressed = LZString.decompressFromBase64(data);
+                if (!decompressed) throw new Error("データの解凍に失敗しました");
+
+                // 2. GeoJSONパース
+                const json = JSON.parse(decompressed);
+                const features = new ol.format.GeoJSON().readFeatures(json, {
+                    featureProjection: 'EPSG:3857' // データは既に3857かもしれないが念のため
+                });
+
+                if (features.length === 0) throw new Error("有効なデータが含まれていません");
+
+                // 3. 地図に追加 (既存はクリアせず追記する仕様)
+                vectorSource.addFeatures(features);
+                
+                // 4. ズーム
+                map.getView().fit(vectorSource.getExtent(), { padding: [50, 50, 50, 50], duration: 1000 });
+                
+                document.getElementById('layer-count').textContent = `地物数: ${vectorSource.getFeatures().length}`;
+                alert(`${features.length}件のデータを読み込みました`);
+
+            } catch (e) {
+                alert("読み込みエラー: " + e.message + "\n\n(データが壊れているか、対応していない形式です)");
+                console.error(e);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }, 100);
+    }
+
+    // --- GPSロジック ---
+    let watchId = null;
+    
+    function toggleGPS() {
+        const btn = document.getElementById('gps-btn');
+        if (watchId) {
+            // 停止
+            navigator.geolocation.clearWatch(watchId);
+            watchId = null;
+            btn.classList.remove('active');
+            gpsSource.clear();
+        } else {
+            // 開始
+            if (!navigator.geolocation) { alert("GPS非対応のブラウザです"); return; }
+            
+            btn.classList.add('active');
+            watchId = navigator.geolocation.watchPosition(
+                (pos) => {
+                    const coords = [pos.coords.longitude, pos.coords.latitude];
+                    const xy = ol.proj.fromLonLat(coords);
+                    
+                    const feature = new ol.Feature(new ol.geom.Point(xy));
+                    gpsSource.clear();
+                    gpsSource.addFeature(feature);
+                    
+                    // 初回のみズーム、あるいは追従モードがあれば追従
+                    // 今回はシンプルに現在地更新のみ
+                },
+                (err) => { alert("GPSエラー: " + err.message); toggleGPS(); },
+                { enableHighAccuracy: true }
+            );
+            
+            // 初回位置取得へジャンプ
+            navigator.geolocation.getCurrentPosition(pos => {
+                const xy = ol.proj.fromLonLat([pos.coords.longitude, pos.coords.latitude]);
+                map.getView().animate({ center: xy, zoom: 16, duration: 1000 });
+            });
+        }
+    }
+
+    // --- 地物クリック (属性表示) ---
+    map.on('click', function(e) {
+        const pixel = map.getEventPixel(e.originalEvent);
+        const feature = map.forEachFeatureAtPixel(pixel, f => f, { hitTolerance: 10 });
+        
+        if (feature && feature !== gpsSource.getFeatures()[0]) {
+            showFeatureInfo(feature);
+        } else {
+            closeInfo();
+        }
+    });
+
+    function showFeatureInfo(feature) {
+        const props = feature.getProperties();
+        let html = '<table>';
+        Object.keys(props).forEach(k => {
+            if (k !== 'geometry' && k !== 'style') {
+                html += `<tr><th>${k}</th><td>${props[k]}</td></tr>`;
+            }
+        });
+        html += '</table>';
+        document.getElementById('info-table').innerHTML = html;
+        document.getElementById('feature-info').classList.add('open');
+    }
+
+    function closeInfo() {
+        document.getElementById('feature-info').classList.remove('open');
+    }
+</script>
+</body>
+</html>
