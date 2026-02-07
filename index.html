@@ -220,6 +220,9 @@
     const ctx = canvas.getContext('2d');
     let animationFrameId = null;
 
+    // 分割データバッファ
+    let qrBuffer = { total: 0, parts: [] };
+
     function startScan() {
         // カメラ使用にはHTTPSまたはlocalhost必須
         if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
@@ -258,9 +261,9 @@
             const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
 
             if (code) {
-                // QR発見
-                handleScannedData(code.data);
+                // QR発見 (少し待機して連続読み込み防止)
                 stopScan();
+                handleScannedData(code.data);
                 return;
             }
         }
@@ -268,6 +271,51 @@
     }
 
     function handleScannedData(data) {
+        // 分割データの判定: "FGS:{index}/{total}:{chunk}"
+        const match = data.match(/^FGS:(\d+)\/(\d+):(.*)$/);
+        
+        if (match) {
+            const index = parseInt(match[1]);
+            const total = parseInt(match[2]);
+            const chunk = match[3];
+
+            if (qrBuffer.total === 0) {
+                // 初回読み込み
+                qrBuffer.total = total;
+                qrBuffer.parts = new Array(total).fill(null);
+                alert(`分割データ(${total}枚)を検知しました。\n1枚目を読み取りました。`);
+            } else if (qrBuffer.total !== total) {
+                alert("異なるデータのQRコードが混ざっています。リセットします。");
+                qrBuffer = { total: 0, parts: [] };
+                return;
+            }
+
+            if (qrBuffer.parts[index - 1] === null) {
+                qrBuffer.parts[index - 1] = chunk;
+                const receivedCount = qrBuffer.parts.filter(p => p !== null).length;
+                
+                if (receivedCount === total) {
+                    // 全データ受信完了 -> 結合して処理
+                    const fullData = qrBuffer.parts.join("");
+                    processGeoJSON(fullData);
+                    qrBuffer = { total: 0, parts: [] }; // リセット
+                } else {
+                    alert(`${index} / ${total} 枚目を読み取りました。\n残り ${total - receivedCount} 枚です。`);
+                    // 連続読み取りのため再開
+                    startScan(); 
+                }
+            } else {
+                alert(`このQRコード(${index}/${total})は既に読み取っています。`);
+                startScan();
+            }
+            return;
+        }
+
+        // 通常データ (分割なし)
+        processGeoJSON(data);
+    }
+
+    function processGeoJSON(data) {
         document.getElementById('loading').style.display = 'block';
         setTimeout(() => {
             try {
@@ -278,12 +326,12 @@
                 // 2. GeoJSONパース
                 const json = JSON.parse(decompressed);
                 const features = new ol.format.GeoJSON().readFeatures(json, {
-                    featureProjection: 'EPSG:3857' // データは既に3857かもしれないが念のため
+                    featureProjection: 'EPSG:3857'
                 });
 
                 if (features.length === 0) throw new Error("有効なデータが含まれていません");
 
-                // 3. 地図に追加 (既存はクリアせず追記する仕様)
+                // 3. 地図に追加
                 vectorSource.addFeatures(features);
                 
                 // 4. ズーム
