@@ -11,73 +11,72 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
+        /* === Base === */
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #eee; overflow: hidden; }
-        
-        #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
-        /* ヘッダー情報 */
+        #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; background: #e0e0e0; }
+
+        /* === Header === */
         .info-bar {
             position: absolute; top: 0; left: 0; width: 100%;
             background: rgba(255,255,255,0.9); padding: 10px 15px;
-            padding-top: env(safe-area-inset-top, 10px);
+            padding-top: max(10px, env(safe-area-inset-top));
             z-index: 5; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             display: flex; justify-content: space-between; align-items: center;
-            box-sizing: border-box; backdrop-filter: blur(5px);
+            backdrop-filter: blur(5px);
         }
         .app-title { font-weight: bold; font-size: 16px; color: #2c3e50; display: flex; align-items: center; gap: 8px; }
         .layer-status { font-size: 12px; color: #666; }
 
-        /* FAB (Floating Action Button) 共通 */
+        /* === FABs === */
         .fab {
             position: absolute; border-radius: 50%;
             background: #fff; color: #555;
             display: flex; justify-content: center; align-items: center;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
             border: none; cursor: pointer; z-index: 10;
             transition: transform 0.1s;
         }
         .fab:active { transform: scale(0.95); }
 
-        /* 地図切替FAB (右上・小さめ) */
+        /* Map Switcher FAB (Top Right) */
         .fab-map {
-            top: 70px; right: 15px; /* ヘッダーの下 */
-            width: 40px; height: 40px; font-size: 16px;
+            top: 80px; right: 15px;
+            width: 44px; height: 44px; font-size: 18px;
+            background: #fff; color: #3498db;
         }
 
-        /* 現在地FAB (右下・標準サイズ) */
+        /* GPS FAB (Bottom Right) */
         .fab-gps {
-            bottom: 90px; right: 20px; /* ボトムナビの上 */
+            bottom: 90px; right: 20px;
             width: 50px; height: 50px; font-size: 20px;
             background: #fff; color: #3498db;
         }
         .fab-gps.active { background: #3498db; color: white; }
 
-        /* ボトムナビゲーション */
+        /* === Bottom Nav === */
         .bottom-nav {
             position: absolute; bottom: 0; left: 0; width: 100%; height: 70px;
             background: rgba(255,255,255,0.98);
-            display: flex; justify-content: space-around; /* 3つなので均等配置 */
-            align-items: center;
+            display: flex; justify-content: space-around; align-items: center;
             box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
             z-index: 20; 
             padding-bottom: env(safe-area-inset-bottom, 0);
-            box-sizing: content-box;
         }
 
         .nav-btn {
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             border: none; background: none; color: #95a5a6;
             font-size: 10px; gap: 4px; cursor: pointer; width: 60px;
-            -webkit-tap-highlight-color: transparent; padding: 0;
         }
         .nav-btn i { font-size: 22px; margin-bottom: 2px; }
         .nav-btn.active { color: #2c3e50; }
 
-        /* 中央のメインボタン（スキャン） */
+        /* Scan Button (Center) */
         .scan-btn-wrapper {
             position: relative; top: -20px;
-            height: 0; display: flex; align-items: center; justify-content: center;
-            width: 70px;
+            height: 0; display: flex; align-items: center; justify-content: center; width: 70px;
         }
         .scan-btn {
             width: 60px; height: 60px; border-radius: 50%;
@@ -86,57 +85,20 @@
             font-size: 26px; border: 4px solid #f5f5f5;
             box-shadow: 0 4px 10px rgba(0,0,0,0.2);
             cursor: pointer;
-            -webkit-tap-highlight-color: transparent;
         }
         .scan-btn:active { transform: scale(0.95); background: #219150; }
 
-        /* ファイル入力 (非表示) */
-        #file-input { display: none; }
-
-        /* モーダル・パネル共通 */
-        #scan-modal, #list-panel, #feature-info {
-            display: none; position: fixed; z-index: 100;
-        }
-
-        /* カメラモーダル */
-        #scan-modal {
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; z-index: 2000; flex-direction: column;
-        }
-        #scan-video { width: 100%; height: 100%; object-fit: cover; }
-        #scan-canvas { display: none; }
-        #scan-guide {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 70%; aspect-ratio: 1/1;
-            border: 4px solid #3498db; border-radius: 20px;
-            box-shadow: 0 0 0 9999px rgba(0,0,0,0.6);
-            pointer-events: none; transition: border-color 0.2s, transform 0.2s;
-        }
-        #scan-guide.success { border-color: #2ecc71; transform: translate(-50%, -50%) scale(1.05); }
-        .scan-msg {
-            position: absolute; top: 10%; left: 0; width: 100%;
-            text-align: center; color: white; font-weight: bold; text-shadow: 0 1px 3px #000;
-            pointer-events: none; z-index: 2002;
-        }
-        .close-scan {
-            position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%);
-            padding: 10px 30px; background: rgba(255,255,255,0.2); border: 2px solid white;
-            color: white; border-radius: 30px; font-weight: bold; font-size: 16px;
-            cursor: pointer; z-index: 2001;
-        }
-
-        /* リストパネル & 属性パネル (Bottom Sheet) */
-        #list-panel, #feature-info {
-            bottom: 0; left: 0; width: 100%; height: 50%;
-            background: white; 
+        /* === Panels (Bottom Sheet) === */
+        .bottom-sheet {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 60%;
+            background: white; z-index: 100;
             border-top-left-radius: 20px; border-top-right-radius: 20px;
             box-shadow: 0 -5px 20px rgba(0,0,0,0.2);
-            flex-direction: column;
-            transform: translateY(100%); /* 初期状態は下に隠す */
+            display: flex; flex-direction: column;
+            transform: translateY(110%);
             transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            display: flex; /* flex指定に戻す */
         }
-        #list-panel.open, #feature-info.open { transform: translateY(0); }
+        .bottom-sheet.open { transform: translateY(0); }
         
         .panel-header {
             padding: 15px 20px; border-bottom: 1px solid #eee; font-weight: bold;
@@ -146,79 +108,143 @@
         }
         .panel-content { flex: 1; overflow-y: auto; padding: 0; padding-bottom: 80px; }
 
-        /* データリストのスタイル */
+        /* Layer List Styles */
+        .layer-section-title { padding: 10px 15px; font-size: 12px; font-weight: bold; color: #7f8c8d; background: #fff; }
+        .layer-list { list-style: none; padding: 0; margin: 0; }
+        .layer-item {
+            padding: 12px 15px; border-bottom: 1px solid #f0f0f0;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .layer-info { flex: 1; display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
+        .layer-name { font-weight: bold; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .layer-ctrl { display: flex; align-items: center; gap: 10px; }
+        
+        /* Base Map Switcher */
+        .basemap-selector { display: flex; gap: 10px; padding: 10px 15px; }
+        .basemap-option {
+            flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px;
+            text-align: center; font-size: 13px; cursor: pointer;
+            display: flex; flex-direction: column; align-items: center; gap: 5px;
+        }
+        .basemap-option.selected { border-color: #27ae60; background: #e8f5e9; color: #27ae60; font-weight: bold; }
+
+        /* Range Slider */
+        input[type=range] { width: 100px; height: 4px; background: #ddd; border-radius: 2px; outline: none; }
+        
+        /* Data List */
         .data-list { list-style: none; padding: 0; margin: 0; }
         .data-item {
             padding: 12px 20px; border-bottom: 1px solid #f0f0f0;
-            display: flex; justify-content: space-between; align-items: center;
-            cursor: pointer;
+            display: flex; justify-content: space-between; align-items: center; cursor: pointer;
         }
         .data-item:active { background: #f5f5f5; }
         .data-title { font-weight: bold; font-size: 14px; color: #333; }
         .data-sub { font-size: 11px; color: #888; margin-top: 2px; }
         .data-icon { color: #3498db; }
 
-        /* テーブルスタイル */
+        /* Feature Info Table */
         table { width: 100%; border-collapse: collapse; font-size: 14px; }
-        th, td { padding: 10px 20px; border-bottom: 1px solid #eee; text-align: left; }
-        th { color: #7f8c8d; width: 30%; font-weight: normal; font-size: 12px; }
-        td { color: #2c3e50; font-weight: 500; }
+        th, td { padding: 12px 15px; border-bottom: 1px solid #eee; text-align: left; }
+        th { color: #7f8c8d; width: 35%; font-weight: normal; font-size: 12px; }
+
+        /* === Modals === */
+        #scan-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 2000; }
+        #scan-video { width: 100%; height: 100%; object-fit: cover; }
+        #scan-guide {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 70%; aspect-ratio: 1/1; border: 4px solid #3498db; border-radius: 20px;
+            box-shadow: 0 0 0 9999px rgba(0,0,0,0.6); pointer-events: none;
+            transition: border-color 0.2s, transform 0.2s;
+        }
+        #scan-guide.success { border-color: #2ecc71; transform: translate(-50%, -50%) scale(1.05); }
+        .scan-msg { position: absolute; top: 10%; width: 100%; text-align: center; color: white; font-weight: bold; text-shadow: 0 1px 3px #000; z-index: 2002; }
+        .close-scan {
+            position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%);
+            padding: 10px 30px; background: rgba(255,255,255,0.2); border: 2px solid white; color: white; border-radius: 30px; font-weight: bold; cursor: pointer; z-index: 2001;
+        }
 
         #loading { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.7); color:white; padding:15px; border-radius:5px; z-index:9999; }
+        #file-input { display: none; }
     </style>
 </head>
 <body>
 
+<!-- Header -->
 <div class="info-bar">
     <div class="app-title"><i class="fas fa-tree"></i> Forestry Scout</div>
     <div class="layer-status" id="layer-count">データなし</div>
 </div>
 
+<!-- Map Container -->
 <div id="map"></div>
 
 <!-- FABs -->
-<button class="fab fab-map" onclick="toggleMapType()" title="地図切替">
+<button class="fab fab-map" onclick="UI.openPanel('layer-panel')" title="レイヤー設定">
     <i class="fas fa-layer-group"></i>
 </button>
-<button class="fab fab-gps" id="gps-btn" onclick="toggleGPS()" title="現在地">
+<button class="fab fab-gps" id="gps-btn" onclick="GPS.toggle()" title="現在地">
     <i class="fas fa-location-arrow"></i>
 </button>
 
-<!-- ボトムナビゲーション -->
+<!-- Bottom Nav -->
 <div class="bottom-nav">
-    <button class="nav-btn" onclick="document.getElementById('file-input').click()" title="ファイル">
+    <button class="nav-btn" onclick="document.getElementById('file-input').click()" title="ファイル追加">
         <i class="fas fa-folder-open"></i>
         <span>ファイル</span>
     </button>
     
     <div class="scan-btn-wrapper">
-        <button class="scan-btn" onclick="startScan()" title="QR読込">
+        <button class="scan-btn" onclick="Scanner.start()" title="QR読込">
             <i class="fas fa-qrcode"></i>
         </button>
     </div>
 
-    <button class="nav-btn" onclick="toggleListPanel()" title="リスト">
+    <button class="nav-btn" onclick="UI.openPanel('list-panel')" title="リスト">
         <i class="fas fa-list-ul"></i>
         <span>リスト</span>
     </button>
 </div>
 
-<input type="file" id="file-input" accept=".zip,.geojson,.json,.kml">
+<!-- Inputs & Modals -->
+<input type="file" id="file-input" accept=".zip,.geojson,.json,.kml,.tif,.tiff">
 
-<!-- QRスキャン画面 -->
 <div id="scan-modal">
     <div class="scan-msg">QRコードを枠内に入れてください</div>
     <video id="scan-video" playsinline></video>
-    <canvas id="scan-canvas"></canvas>
+    <canvas id="scan-canvas" style="display:none;"></canvas>
     <div id="scan-guide"></div>
-    <button class="close-scan" onclick="stopScan()">閉じる</button>
+    <button class="close-scan" onclick="Scanner.stop()">閉じる</button>
 </div>
 
-<!-- データリストパネル -->
-<div id="list-panel">
+<!-- Layer Panel -->
+<div id="layer-panel" class="bottom-sheet">
+    <div class="panel-header">
+        <span><i class="fas fa-layer-group"></i> レイヤー管理</span>
+        <i class="fas fa-times" onclick="UI.closePanel()" style="padding:10px; cursor:pointer; color:#95a5a6;"></i>
+    </div>
+    <div class="panel-content">
+        <div class="layer-section-title">ベースマップ</div>
+        <div class="basemap-selector">
+            <div class="basemap-option selected" id="base-std" onclick="AppMap.switchBaseMap('std')">
+                <i class="fas fa-map"></i> 標準地図
+            </div>
+            <div class="basemap-option" id="base-photo" onclick="AppMap.switchBaseMap('photo')">
+                <i class="fas fa-satellite"></i> 航空写真
+            </div>
+        </div>
+        
+        <div class="layer-section-title">追加レイヤー</div>
+        <ul id="overlay-list" class="layer-list">
+            <li style="padding:15px; text-align:center; color:#999; font-size:12px;">レイヤーがありません</li>
+        </ul>
+    </div>
+</div>
+
+<!-- List Panel -->
+<div id="list-panel" class="bottom-sheet">
     <div class="panel-header">
         <span><i class="fas fa-list"></i> 地物一覧</span>
-        <i class="fas fa-times" onclick="toggleListPanel(false)" style="padding:5px 10px; cursor:pointer; font-size:18px; color:#95a5a6;"></i>
+        <i class="fas fa-times" onclick="UI.closePanel()" style="padding:10px; cursor:pointer; color:#95a5a6;"></i>
     </div>
     <div class="panel-content">
         <ul id="feature-list" class="data-list">
@@ -227,11 +253,11 @@
     </div>
 </div>
 
-<!-- 属性情報パネル -->
-<div id="feature-info">
+<!-- Info Panel -->
+<div id="feature-info" class="bottom-sheet">
     <div class="panel-header">
         <span><i class="fas fa-info-circle"></i> 詳細情報</span>
-        <i class="fas fa-times" onclick="closeInfo()" style="padding:5px 10px; cursor:pointer; font-size:18px; color:#95a5a6;"></i>
+        <i class="fas fa-times" onclick="UI.closePanel()" style="padding:10px; cursor:pointer; color:#95a5a6;"></i>
     </div>
     <div class="panel-content" id="info-table"></div>
 </div>
@@ -240,277 +266,464 @@
 
 <!-- Libraries -->
 <script src="https://cdn.jsdelivr.net/npm/openlayers@4.6.5/dist/ol.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.15.0/proj4.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
 <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/geotiff"></script>
 
 <script>
-    // --- 初期化 ---
-    const baseLayers = {
-        std: new ol.layer.Tile({ source: new ol.source.XYZ({ url: "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png", attributions: "地理院", crossOrigin: 'anonymous' }), visible: true }),
-        photo: new ol.layer.Tile({ source: new ol.source.XYZ({ url: "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg", attributions: "地理院", crossOrigin: 'anonymous' }), visible: false })
+/**
+ * Forestry Scout Mobile App
+ * Organized into modules for better maintainability.
+ */
+
+// --- 1. Configuration & Constants ---
+const Config = {
+    EPSG_DEFS: [
+        { code: "EPSG:6677", def: "+proj=tmerc +lat_0=36 +lon_0=139.833333 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs" },
+        { code: "EPSG:6669", def: "+proj=tmerc +lat_0=33 +lon_0=129.5 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs" },
+        { code: "EPSG:6670", def: "+proj=tmerc +lat_0=33 +lon_0=131.0 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs" },
+        { code: "EPSG:6671", def: "+proj=tmerc +lat_0=36 +lon_0=132.166666 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs" },
+        { code: "EPSG:6672", def: "+proj=tmerc +lat_0=33 +lon_0=133.5 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs" },
+        { code: "EPSG:6673", def: "+proj=tmerc +lat_0=36 +lon_0=134.333333 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs" },
+        { code: "EPSG:6674", def: "+proj=tmerc +lat_0=36 +lon_0=136.0 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs" },
+        { code: "EPSG:6675", def: "+proj=tmerc +lat_0=36 +lon_0=137.166666 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs" },
+        { code: "EPSG:6676", def: "+proj=tmerc +lat_0=36 +lon_0=138.5 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs" },
+        { code: "EPSG:6678", def: "+proj=tmerc +lat_0=40 +lon_0=140.833333 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs" },
+        { code: "EPSG:6679", def: "+proj=tmerc +lat_0=44 +lon_0=140.25 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs" },
+        { code: "EPSG:6680", def: "+proj=tmerc +lat_0=44 +lon_0=142.25 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs" },
+        { code: "EPSG:6681", def: "+proj=tmerc +lat_0=44 +lon_0=144.25 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs" }
+    ],
+    BASE_LAYERS: {
+        std: "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png",
+        photo: "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg"
+    }
+};
+
+// --- 2. State Management ---
+const State = {
+    addedLayers: [], // { name, layer, type }
+    watchId: null,   // GPS Watch ID
+    qrBuffer: { total: 0, parts: [] }
+};
+
+// --- 3. Map Controller ---
+const AppMap = (function() {
+    let map;
+    const sources = {
+        base: {},
+        vector: new ol.source.Vector(),
+        gps: new ol.source.Vector()
+    };
+    const layers = {
+        base: {},
+        vector: null,
+        gps: null
     };
 
-    const vectorSource = new ol.source.Vector();
-    const vectorLayer = new ol.layer.Vector({
-        source: vectorSource,
-        style: new ol.style.Style({
-            fill: new ol.style.Fill({ color: 'rgba(231, 76, 60, 0.4)' }),
-            stroke: new ol.style.Stroke({ color: '#c0392b', width: 2 }),
-            image: new ol.style.Circle({ radius: 6, fill: new ol.style.Fill({color: '#e74c3c'}), stroke: new ol.style.Stroke({color:'#fff', width:2}) })
-        })
-    });
+    function init() {
+        // Initialize Proj4
+        Config.EPSG_DEFS.forEach(d => proj4.defs(d.code, d.def));
+        ol.proj.setProj4(proj4);
 
-    const gpsSource = new ol.source.Vector();
-    const gpsLayer = new ol.layer.Vector({
-        source: gpsSource,
-        zIndex: 999,
-        style: new ol.style.Style({
-            image: new ol.style.Circle({ radius: 8, fill: new ol.style.Fill({color: '#3498db'}), stroke: new ol.style.Stroke({color: '#fff', width: 3}) })
-        })
-    });
+        // Base Layers
+        layers.base.std = new ol.layer.Tile({ source: new ol.source.XYZ({ url: Config.BASE_LAYERS.std, attributions: "地理院", crossOrigin: 'anonymous' }), visible: true, zIndex: 0 });
+        layers.base.photo = new ol.layer.Tile({ source: new ol.source.XYZ({ url: Config.BASE_LAYERS.photo, attributions: "地理院", crossOrigin: 'anonymous' }), visible: false, zIndex: 0 });
 
-    const map = new ol.Map({
-        target: 'map',
-        controls: ol.control.defaults({ attribution: false, zoom: false }),
-        layers: [ baseLayers.std, baseLayers.photo, vectorLayer, gpsLayer ],
-        view: new ol.View({ center: ol.proj.fromLonLat([138, 36]), zoom: 6 })
-    });
+        // Vector Layer (Overlay)
+        layers.vector = new ol.layer.Vector({
+            source: sources.vector,
+            zIndex: 1000,
+            style: new ol.style.Style({
+                fill: new ol.style.Fill({ color: 'rgba(231, 76, 60, 0.4)' }),
+                stroke: new ol.style.Stroke({ color: '#c0392b', width: 2 }),
+                image: new ol.style.Circle({ radius: 6, fill: new ol.style.Fill({color: '#e74c3c'}), stroke: new ol.style.Stroke({color:'#fff', width:2}) })
+            })
+        });
+        State.addedLayers.push({ name: "インポート地物", layer: layers.vector, type: 'vector' });
 
-    function toggleMapType() {
-        const isStd = baseLayers.std.getVisible();
-        baseLayers.std.setVisible(!isStd);
-        baseLayers.photo.setVisible(isStd);
-    }
+        // GPS Layer
+        layers.gps = new ol.layer.Vector({
+            source: sources.gps, zIndex: 9999,
+            style: new ol.style.Style({ image: new ol.style.Circle({ radius: 8, fill: new ol.style.Fill({color: '#3498db'}), stroke: new ol.style.Stroke({color: '#fff', width: 3}) }) })
+        });
 
-    // --- ファイル読み込み処理 ---
-    document.getElementById('file-input').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        document.getElementById('loading').style.display = 'block';
-        
-        const reader = new FileReader();
-        reader.onload = function(ev) {
-            try {
-                if (file.name.match(/\.zip$/i)) {
-                    shp(ev.target.result).then(geojson => { addGeoJSONFeatures(geojson); finishImport(); })
-                    .catch(err => { throw new Error("ZIP解析失敗: " + err); });
-                } else if (file.name.match(/\.json$|\.geojson$/i)) {
-                    addGeoJSONFeatures(JSON.parse(ev.target.result)); finishImport();
-                } else if (file.name.match(/\.kml$/i)) {
-                    const features = new ol.format.KML({extractStyles:false}).readFeatures(ev.target.result, {featureProjection:'EPSG:3857'});
-                    if (features.length > 0) {
-                        vectorSource.addFeatures(features);
-                        map.getView().fit(vectorSource.getExtent(), { padding: [50, 50, 50, 50], duration: 1000 });
-                        updateStatus(features.length);
-                        refreshList(); // リスト更新
-                    }
-                    finishImport();
-                } else {
-                    alert("未対応のファイル形式です");
-                    finishImport();
-                }
-            } catch (err) {
-                alert("読み込みエラー: " + err.message);
-                finishImport();
+        // Map Instance (Disable rotation for mobile stability)
+        map = new ol.Map({
+            target: 'map',
+            controls: ol.control.defaults({ attribution: false, zoom: false, rotate: false }),
+            interactions: ol.interaction.defaults({ altShiftDragRotate: false, pinchRotate: false }),
+            layers: [ layers.base.std, layers.base.photo, layers.vector, layers.gps ],
+            view: new ol.View({ center: ol.proj.fromLonLat([138, 36]), zoom: 6 })
+        });
+
+        // Click Event
+        map.on('click', e => {
+            const pixel = map.getEventPixel(e.originalEvent);
+            const feature = map.forEachFeatureAtPixel(pixel, f => f, { hitTolerance: 10 });
+            if (feature && feature !== layers.gps.getSource().getFeatures()[0]) {
+                UI.showFeatureInfo(feature);
+            } else {
+                UI.closePanel();
             }
-        };
-
-        if (file.name.match(/\.zip$/i)) reader.readAsArrayBuffer(file);
-        else reader.readAsText(file);
-        this.value = '';
-    });
-
-    function finishImport() { document.getElementById('loading').style.display = 'none'; }
-
-    function addGeoJSONFeatures(json) {
-        const features = new ol.format.GeoJSON().readFeatures(json, { featureProjection: 'EPSG:3857' });
-        if (features.length > 0) {
-            vectorSource.addFeatures(features);
-            map.getView().fit(vectorSource.getExtent(), { padding: [50, 50, 50, 50], duration: 1000 });
-            updateStatus(features.length);
-            refreshList(); // リスト更新
-            alert(`${features.length}件のデータを読み込みました`);
-        } else { alert("有効な地物がありません"); }
+        });
     }
 
-    function updateStatus(count) {
-        document.getElementById('layer-count').textContent = `地物数: ${vectorSource.getFeatures().length}`;
+    function switchBaseMap(type) {
+        layers.base.std.setVisible(type === 'std');
+        layers.base.photo.setVisible(type === 'photo');
+        document.getElementById('base-std').classList.toggle('selected', type==='std');
+        document.getElementById('base-photo').classList.toggle('selected', type==='photo');
     }
 
-    // --- データリスト機能 ---
-    function toggleListPanel(show) {
-        const panel = document.getElementById('list-panel');
-        if (show === undefined) panel.classList.toggle('open');
-        else if (show) panel.classList.add('open');
-        else panel.classList.remove('open');
-        
-        if (panel.classList.contains('open')) refreshList();
+    function addLayer(layerObj, name, type) {
+        map.addLayer(layerObj);
+        State.addedLayers.push({ name: name, layer: layerObj, type: type });
+        UI.updateLayerList();
     }
 
-    function refreshList() {
+    function zoomTo(extent) {
+        map.getView().fit(extent, { padding: [50, 50, 50, 50], duration: 1000 });
+    }
+
+    function updateGPS(coords) {
+        const xy = ol.proj.fromLonLat(coords);
+        sources.gps.clear();
+        sources.gps.addFeature(new ol.Feature(new ol.geom.Point(xy)));
+    }
+    
+    function panTo(coords) {
+        const xy = ol.proj.fromLonLat(coords);
+        map.getView().animate({ center: xy, zoom: 16, duration: 1000 });
+    }
+
+    return { init, switchBaseMap, addLayer, zoomTo, updateGPS, panTo, sources, getMap: () => map };
+})();
+
+// --- 4. UI Controller ---
+const UI = (function() {
+    function openPanel(id) {
+        document.querySelectorAll('.bottom-sheet').forEach(p => p.classList.remove('open'));
+        document.getElementById(id).classList.add('open');
+        if (id === 'layer-panel') updateLayerList();
+        if (id === 'list-panel') refreshFeatureList();
+    }
+
+    function closePanel() {
+        document.querySelectorAll('.bottom-sheet').forEach(p => p.classList.remove('open'));
+    }
+
+    function setLoading(show) {
+        document.getElementById('loading').style.display = show ? 'block' : 'none';
+    }
+
+    function updateLayerStatus() {
+        const count = AppMap.sources.vector.getFeatures().length;
+        document.getElementById('layer-count').textContent = count > 0 ? `地物数: ${count}` : "データなし";
+    }
+
+    function showFeatureInfo(feature) {
+        const props = feature.getProperties();
+        let html = '<table>';
+        Object.keys(props).forEach(k => {
+            if (k !== 'geometry' && k !== 'style') {
+                html += `<tr><th>${k}</th><td>${props[k]}</td></tr>`;
+            }
+        });
+        html += '</table>';
+        document.getElementById('info-table').innerHTML = html;
+        openPanel('feature-info');
+    }
+
+    function updateLayerList() {
+        const ul = document.getElementById('overlay-list');
+        ul.innerHTML = "";
+        State.addedLayers.forEach((l, idx) => {
+            const li = document.createElement('li');
+            li.className = 'layer-item';
+            const opacity = l.layer.getOpacity();
+            li.innerHTML = `
+                <div class="layer-info">
+                    <span class="layer-name">${l.name}</span>
+                    <input type="range" min="0" max="1" step="0.1" value="${opacity}" 
+                           oninput="State.addedLayers[${idx}].layer.setOpacity(parseFloat(this.value))">
+                </div>
+                <div class="layer-ctrl">
+                    <i class="fas ${l.layer.getVisible() ? 'fa-eye' : 'fa-eye-slash'}" 
+                       onclick="UI.toggleLayerVisible(${idx}, this)" style="font-size:18px; color:#555;"></i>
+                </div>
+            `;
+            ul.appendChild(li);
+        });
+        if (State.addedLayers.length === 0) ul.innerHTML = '<li style="padding:15px; text-align:center; color:#999;">レイヤーなし</li>';
+    }
+
+    function toggleLayerVisible(idx, icon) {
+        const l = State.addedLayers[idx].layer;
+        const v = !l.getVisible();
+        l.setVisible(v);
+        icon.className = `fas ${v ? 'fa-eye' : 'fa-eye-slash'}`;
+    }
+
+    function refreshFeatureList() {
         const list = document.getElementById('feature-list');
         list.innerHTML = "";
-        const features = vectorSource.getFeatures();
+        const features = AppMap.sources.vector.getFeatures();
         
         if (features.length === 0) {
             list.innerHTML = '<li style="padding:20px; text-align:center; color:#999;">データがありません</li>';
             return;
         }
 
-        // 地物リスト生成 (上限100件)
-        features.slice(0, 100).forEach((f, index) => {
+        features.slice(0, 50).forEach((f, i) => {
             const props = f.getProperties();
-            // 代表的な属性を探す (林班、ID、名称など)
-            let title = `地物 ${index + 1}`;
-            let sub = "";
-            const keys = Object.keys(props).filter(k => k!=='geometry' && k!=='style');
+            // 代表属性の推測
+            const titleKey = Object.keys(props).find(k => k.match(/林班|名称|NAME|ID|NO/i)) || Object.keys(props).filter(k=>k!=='geometry'&&k!=='style')[0];
+            const title = titleKey ? props[titleKey] : `地物 ${i+1}`;
             
-            // 優先キー検索
-            const titleKey = keys.find(k => k.match(/林班|名称|NAME|ID|NO/i));
-            if (titleKey) {
-                title = props[titleKey];
-                // サブ情報 (別の属性があれば)
-                const subKey = keys.find(k => k !== titleKey && k.match(/小班|SUB|AREA|面積/i));
-                if (subKey) sub = `${subKey}: ${props[subKey]}`;
-            }
-
             const li = document.createElement('li');
             li.className = 'data-item';
-            li.innerHTML = `
-                <div>
-                    <div class="data-title">${title}</div>
-                    ${sub ? `<div class="data-sub">${sub}</div>` : ''}
-                </div>
-                <div class="data-icon"><i class="fas fa-search-location"></i></div>
-            `;
+            li.innerHTML = `<div class="data-title">${title}</div><div class="data-icon"><i class="fas fa-search"></i></div>`;
             li.onclick = () => {
                 const extent = f.getGeometry().getExtent();
-                map.getView().fit(extent, { padding: [100, 50, 50, 50], duration: 800 });
-                toggleListPanel(false);
-                setTimeout(() => showFeatureInfo(f), 800); // ズーム後に詳細表示
+                // 少し引いた状態でズーム
+                AppMap.getMap().getView().fit(extent, { padding: [100, 50, 50, 50], duration: 800 });
+                closePanel();
+                setTimeout(() => showFeatureInfo(f), 800);
             };
             list.appendChild(li);
         });
+    }
+
+    return { openPanel, closePanel, setLoading, updateLayerStatus, showFeatureInfo, updateLayerList, toggleLayerVisible };
+})();
+
+// --- 5. GPS Controller ---
+const GPS = (function() {
+    function toggle() {
+        const btn = document.getElementById('gps-btn');
+        if (State.watchId) {
+            navigator.geolocation.clearWatch(State.watchId);
+            State.watchId = null;
+            btn.classList.remove('active');
+            AppMap.sources.gps.clear();
+        } else {
+            if (!navigator.geolocation) { alert("GPS非対応"); return; }
+            btn.classList.add('active');
+            State.watchId = navigator.geolocation.watchPosition(
+                pos => AppMap.updateGPS([pos.coords.longitude, pos.coords.latitude]),
+                err => { alert("GPSエラー: " + err.message); toggle(); },
+                { enableHighAccuracy: true }
+            );
+            navigator.geolocation.getCurrentPosition(pos => {
+                AppMap.panTo([pos.coords.longitude, pos.coords.latitude]);
+            });
+        }
+    }
+    return { toggle };
+})();
+
+// --- 6. File Importer ---
+const Importer = (function() {
+    function handleFile(file) {
+        if (!file) return;
+        UI.setLoading(true);
         
-        if (features.length > 100) {
-            const li = document.createElement('li');
-            li.style.padding = '15px'; li.style.textAlign = 'center'; li.style.color = '#999';
-            li.textContent = `他 ${features.length - 100} 件...`;
-            list.appendChild(li);
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                if (file.name.match(/\.zip$/i)) {
+                    shp(e.target.result).then(g => { loadGeoJSON(g, file.name); finish(); })
+                    .catch(err => { throw new Error(err); });
+                } else if (file.name.match(/\.json$|\.geojson$/i)) {
+                    loadGeoJSON(JSON.parse(e.target.result), file.name); finish();
+                } else if (file.name.match(/\.kml$/i)) {
+                    loadKML(e.target.result); finish();
+                } else if (file.name.match(/\.tif$|\.tiff$/i)) {
+                    loadGeoTIFF(file); // Use file blob directly
+                } else {
+                    alert("未対応の形式です"); finish();
+                }
+            } catch (err) {
+                alert("読込エラー: " + err.message); finish();
+            }
+        };
+
+        if (file.name.match(/\.zip$/i)) reader.readAsArrayBuffer(file);
+        else if (file.name.match(/\.tif$/i)) {} // Skip reader for TIFF
+        else reader.readAsText(file);
+        
+        // TIFF logic specific call
+        if (file.name.match(/\.tif$/i)) {
+            // Reader not needed for geotiff.js fromBlob
+            handleGeoTIFF(file);
         }
     }
 
-    // --- QRスキャンロジック ---
-    const video = document.getElementById('scan-video');
-    const canvas = document.getElementById('scan-canvas');
-    const ctx = canvas.getContext('2d');
-    const scanGuide = document.getElementById('scan-guide');
-    let animationFrameId = null;
-    let qrBuffer = { total: 0, parts: [] };
+    function finish() { UI.setLoading(false); document.getElementById('file-input').value = ''; }
 
-    function startScan() {
-        if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-            alert("カメラにはHTTPSが必要です"); return;
+    function loadGeoJSON(json, name) {
+        const features = new ol.format.GeoJSON().readFeatures(json, { featureProjection: 'EPSG:3857' });
+        if (features.length > 0) {
+            AppMap.sources.vector.addFeatures(features);
+            AppMap.zoomTo(AppMap.sources.vector.getExtent());
+            UI.updateLayerStatus();
+            alert(`${features.length}件のデータを読み込みました`);
+        } else { alert("有効な地物がありません"); }
+    }
+
+    function loadKML(data) {
+        const features = new ol.format.KML({extractStyles:false}).readFeatures(data, {featureProjection:'EPSG:3857'});
+        if (features.length > 0) {
+            AppMap.sources.vector.addFeatures(features);
+            AppMap.zoomTo(AppMap.sources.vector.getExtent());
+            UI.updateLayerStatus();
         }
+    }
+    
+    // GeoTIFF logic separated for reuse
+    async function handleGeoTIFF(file) {
+        try {
+            // geotiff.js logic
+            const tiff = await GeoTIFF.fromBlob(file);
+            const image = await tiff.getImage();
+            const width = image.getWidth(); const height = image.getHeight();
+            const rasters = await image.readRasters();
+            
+            const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
+            const ctx = canvas.getContext('2d'); const imageData = ctx.createImageData(width, height);
+            
+            // Loop optimized
+            const r0 = rasters[0], r1 = rasters[1], r2 = rasters[2];
+            const isRGB = rasters.length >= 3;
+            const data = imageData.data;
+            
+            for (let i = 0, j = 0; i < width * height; i++, j+=4) {
+                if (isRGB) {
+                    data[j] = r0[i]; data[j+1] = r1[i]; data[j+2] = r2[i]; data[j+3] = 255;
+                } else {
+                    const val = r0[i]; data[j] = val; data[j+1] = val; data[j+2] = val; data[j+3] = 255;
+                }
+            }
+            ctx.putImageData(imageData, 0, 0);
+
+            // Ask EPSG
+            let epsg = "EPSG:6677"; 
+            const userSys = prompt("座標系を入力してください (例: 6677)\n9系:6677, 10系:6678", "6677");
+            if (userSys) epsg = "EPSG:" + userSys;
+
+            const tiepoint = image.getTiePoints()[0];
+            const pixelScale = image.getFileDirectory().ModelPixelScale;
+
+            if (tiepoint && pixelScale) {
+                const minX = tiepoint.x; const maxY = tiepoint.y;
+                const maxX = minX + width * pixelScale[0]; const minY = maxY - height * pixelScale[1];
+                const trans = proj4(epsg, 'EPSG:3857').forward;
+                const minXY = trans([minX, minY]); const maxXY = trans([maxX, maxY]);
+                const extent = [minXY[0], minXY[1], maxXY[0], maxXY[1]];
+                
+                const newLayer = new ol.layer.Image({
+                    source: new ol.source.ImageStatic({ url: canvas.toDataURL(), imageExtent: extent, projection: 'EPSG:3857' }),
+                    opacity: 0.7, zIndex: 10
+                });
+                
+                AppMap.addLayer(newLayer, file.name, 'raster');
+                AppMap.zoomTo(extent);
+            } else { alert("位置情報なし"); }
+            finish();
+
+        } catch(e) { alert("GeoTIFFエラー: " + e.message); finish(); }
+    }
+
+    return { handleFile, loadGeoJSON };
+})();
+
+// --- 7. QR Scanner ---
+const Scanner = (function() {
+    let video, canvas, ctx, guide, animId;
+    
+    function init() {
+        video = document.getElementById('scan-video');
+        canvas = document.getElementById('scan-canvas');
+        ctx = canvas.getContext('2d');
+        guide = document.getElementById('scan-guide');
+    }
+
+    function start() {
+        if (location.protocol !== 'https:' && location.hostname !== 'localhost') { alert("要HTTPS"); return; }
         document.getElementById('scan-modal').style.display = 'flex';
-        scanGuide.classList.remove('success');
+        guide.classList.remove('success');
         
-        const constraints = { video: { facingMode: "environment", width: { ideal: 1280 } } };
-        navigator.mediaDevices.getUserMedia(constraints).then(function(stream) {
-            video.srcObject = stream; video.setAttribute("playsinline", true); video.play(); requestAnimationFrame(tick);
-        }).catch(err => { alert("カメラ起動失敗: " + err); stopScan(); });
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } } })
+        .then(stream => { video.srcObject = stream; video.play(); tick(); })
+        .catch(e => { alert("カメラエラー: " + e); stop(); });
     }
 
-    function stopScan() {
+    function stop() {
         document.getElementById('scan-modal').style.display = 'none';
-        if(video.srcObject) { video.srcObject.getTracks().forEach(track => track.stop()); video.srcObject = null; }
-        if(animationFrameId) cancelAnimationFrame(animationFrameId);
+        if (video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); video.srcObject = null; }
+        cancelAnimationFrame(animId);
     }
 
     function tick() {
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            canvas.height = video.videoHeight; canvas.width = video.videoWidth;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
             if (code) {
-                scanGuide.classList.add('success'); if (navigator.vibrate) navigator.vibrate(200);
-                setTimeout(() => { stopScan(); handleScannedData(code.data); }, 300);
+                guide.classList.add('success'); 
+                if (navigator.vibrate) navigator.vibrate(200);
+                setTimeout(() => { stop(); handleData(code.data); }, 300);
                 return;
             }
         }
-        animationFrameId = requestAnimationFrame(tick);
+        animId = requestAnimationFrame(tick);
     }
 
-    function handleScannedData(data) {
+    function handleData(data) {
         const match = data.match(/^FGS:(\d+)\/(\d+):(.*)$/);
         if (match) {
-            const index = parseInt(match[1]); const total = parseInt(match[2]); const chunk = match[3];
-            if (qrBuffer.total === 0) { qrBuffer.total = total; qrBuffer.parts = new Array(total).fill(null); alert(`分割データ(${total}枚)を検知。1枚目を読込完了。`); } 
-            else if (qrBuffer.total !== total) { alert("データ不一致。リセットします。"); qrBuffer = { total: 0, parts: [] }; return; }
-
-            if (qrBuffer.parts[index - 1] === null) {
-                qrBuffer.parts[index - 1] = chunk;
-                const receivedCount = qrBuffer.parts.filter(p => p !== null).length;
-                if (receivedCount === total) { processGeoJSON(qrBuffer.parts.join("")); qrBuffer = { total: 0, parts: [] }; } 
-                else { alert(`${index}/${total} 読込完了。\n残り${total - receivedCount}枚。\nOKを押して次をスキャンしてください。`); startScan(); }
-            } else { alert(`このQR(${index}/${total})は読込済みです。\n別のQRをスキャンしてください。`); startScan(); }
-            return;
-        }
-        processGeoJSON(data);
+            const idx = parseInt(match[1]), total = parseInt(match[2]), chunk = match[3];
+            const buffer = State.qrBuffer;
+            if (buffer.total === 0) { buffer.total = total; buffer.parts = new Array(total).fill(null); alert(`分割データ(${total}枚) 1枚目検知`); }
+            
+            if (!buffer.parts[idx-1]) {
+                buffer.parts[idx-1] = chunk;
+                const count = buffer.parts.filter(p => p).length;
+                if (count === total) { 
+                    processData(buffer.parts.join("")); 
+                    State.qrBuffer = { total: 0, parts: [] }; 
+                } else { 
+                    alert(`${idx}/${total} 読込完了\n残り${total-count}枚\n次をスキャンしてください`); 
+                    start(); 
+                }
+            } else { alert("読込済みです"); start(); }
+        } else { processData(data); }
     }
 
-    function processGeoJSON(data) {
-        document.getElementById('loading').style.display = 'block';
+    function processData(raw) {
+        UI.setLoading(true);
         setTimeout(() => {
             try {
-                const decompressed = LZString.decompressFromBase64(data);
-                if (!decompressed) throw new Error("解凍失敗");
-                addGeoJSONFeatures(JSON.parse(decompressed));
-            } catch (e) { alert("読込エラー: " + e.message); console.error(e); } 
-            finally { document.getElementById('loading').style.display = 'none'; }
+                const json = JSON.parse(LZString.decompressFromBase64(raw));
+                Importer.loadGeoJSON(json, "QRデータ");
+            } catch(e) { alert("データ破損"); } 
+            finally { UI.setLoading(false); }
         }, 100);
     }
 
-    // --- GPSロジック ---
-    let watchId = null;
-    function toggleGPS() {
-        const btn = document.getElementById('gps-btn');
-        if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; btn.classList.remove('active'); gpsSource.clear(); } 
-        else {
-            if (!navigator.geolocation) { alert("GPS非対応"); return; }
-            btn.classList.add('active');
-            watchId = navigator.geolocation.watchPosition(
-                (pos) => {
-                    const xy = ol.proj.fromLonLat([pos.coords.longitude, pos.coords.latitude]);
-                    gpsSource.clear(); gpsSource.addFeature(new ol.Feature(new ol.geom.Point(xy)));
-                },
-                (err) => { alert("GPSエラー: " + err.message); toggleGPS(); }, { enableHighAccuracy: true }
-            );
-            navigator.geolocation.getCurrentPosition(pos => {
-                const xy = ol.proj.fromLonLat([pos.coords.longitude, pos.coords.latitude]);
-                map.getView().animate({ center: xy, zoom: 16, duration: 1000 });
-            });
-        }
-    }
+    return { init, start, stop };
+})();
 
-    // --- 地物クリック ---
-    map.on('click', function(e) {
-        const pixel = map.getEventPixel(e.originalEvent);
-        const feature = map.forEachFeatureAtPixel(pixel, f => f, { hitTolerance: 10 });
-        if (feature && feature !== gpsSource.getFeatures()[0]) showFeatureInfo(feature); else closeInfo();
-    });
+// --- Main Entry ---
+window.onload = function() {
+    AppMap.init();
+    Scanner.init();
+    document.getElementById('file-input').addEventListener('change', e => Importer.handleFile(e.target.files[0]));
+};
 
-    function showFeatureInfo(feature) {
-        const props = feature.getProperties();
-        let html = '<table>';
-        Object.keys(props).forEach(k => { if (k !== 'geometry' && k !== 'style') html += `<tr><th>${k}</th><td>${props[k]}</td></tr>`; });
-        html += '</table>';
-        document.getElementById('info-table').innerHTML = html; document.getElementById('feature-info').classList.add('open');
-    }
-    function closeInfo() { document.getElementById('feature-info').classList.remove('open'); }
 </script>
 </body>
 </html>
