@@ -27,41 +27,63 @@
         .app-title { font-weight: bold; font-size: 16px; color: #2c3e50; display: flex; align-items: center; gap: 8px; }
         .layer-status { font-size: 12px; color: #666; }
 
+        /* FAB (Floating Action Button) 共通 */
+        .fab {
+            position: absolute; border-radius: 50%;
+            background: #fff; color: #555;
+            display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            border: none; cursor: pointer; z-index: 10;
+            transition: transform 0.1s;
+        }
+        .fab:active { transform: scale(0.95); }
+
+        /* 地図切替FAB (右上・小さめ) */
+        .fab-map {
+            top: 70px; right: 15px; /* ヘッダーの下 */
+            width: 40px; height: 40px; font-size: 16px;
+        }
+
+        /* 現在地FAB (右下・標準サイズ) */
+        .fab-gps {
+            bottom: 90px; right: 20px; /* ボトムナビの上 */
+            width: 50px; height: 50px; font-size: 20px;
+            background: #fff; color: #3498db;
+        }
+        .fab-gps.active { background: #3498db; color: white; }
+
         /* ボトムナビゲーション */
         .bottom-nav {
             position: absolute; bottom: 0; left: 0; width: 100%; height: 70px;
-            background: rgba(255,255,255,0.95);
-            display: flex; justify-content: space-evenly;
+            background: rgba(255,255,255,0.98);
+            display: flex; justify-content: space-around; /* 3つなので均等配置 */
             align-items: center;
             box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
             z-index: 20; 
-            backdrop-filter: blur(5px);
             padding-bottom: env(safe-area-inset-bottom, 0);
-            box-sizing: border-box;
+            box-sizing: content-box;
         }
 
         .nav-btn {
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            border: none; background: none; color: #7f8c8d;
-            font-size: 10px; gap: 4px; cursor: pointer; width: 50px;
-            -webkit-tap-highlight-color: transparent;
-            padding: 0;
+            border: none; background: none; color: #95a5a6;
+            font-size: 10px; gap: 4px; cursor: pointer; width: 60px;
+            -webkit-tap-highlight-color: transparent; padding: 0;
         }
-        .nav-btn i { font-size: 20px; margin-bottom: 2px; transition: color 0.2s; }
-        .nav-btn.active { color: #3498db; }
-        .nav-btn.active i { color: #3498db; }
+        .nav-btn i { font-size: 22px; margin-bottom: 2px; }
+        .nav-btn.active { color: #2c3e50; }
 
         /* 中央のメインボタン（スキャン） */
         .scan-btn-wrapper {
             position: relative; top: -20px;
             height: 0; display: flex; align-items: center; justify-content: center;
-            width: 60px;
+            width: 70px;
         }
         .scan-btn {
-            width: 56px; height: 56px; border-radius: 50%;
+            width: 60px; height: 60px; border-radius: 50%;
             background: #27ae60; color: white;
             display: flex; justify-content: center; align-items: center;
-            font-size: 24px; border: 4px solid #f5f5f5;
+            font-size: 26px; border: 4px solid #f5f5f5;
             box-shadow: 0 4px 10px rgba(0,0,0,0.2);
             cursor: pointer;
             -webkit-tap-highlight-color: transparent;
@@ -71,45 +93,26 @@
         /* ファイル入力 (非表示) */
         #file-input { display: none; }
 
+        /* モーダル・パネル共通 */
+        #scan-modal, #list-panel, #feature-info {
+            display: none; position: fixed; z-index: 100;
+        }
+
         /* カメラモーダル */
         #scan-modal {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 2000; flex-direction: column;
         }
         #scan-video { width: 100%; height: 100%; object-fit: cover; }
         #scan-canvas { display: none; }
-        
-        /* スキャンガイド枠 */
         #scan-guide {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 70%; aspect-ratio: 1/1;
             border: 4px solid #3498db; border-radius: 20px;
-            box-shadow: 0 0 0 9999px rgba(0,0,0,0.6); /* 周りを暗く */
-            pointer-events: none;
-            transition: border-color 0.2s, transform 0.2s;
+            box-shadow: 0 0 0 9999px rgba(0,0,0,0.6);
+            pointer-events: none; transition: border-color 0.2s, transform 0.2s;
         }
-        /* 読み取り成功時のスタイル */
-        #scan-guide.success {
-            border-color: #2ecc71;
-            transform: translate(-50%, -50%) scale(1.05);
-            box-shadow: 0 0 20px #2ecc71, 0 0 0 9999px rgba(0,0,0,0.6);
-        }
-
-        /* スキャンラインアニメーション */
-        #scan-guide::after {
-            content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 2px;
-            background: #3498db; box-shadow: 0 0 4px #3498db;
-            animation: scan-anim 2s infinite linear;
-        }
-        #scan-guide.success::after { display: none; }
-
-        @keyframes scan-anim {
-            0% { top: 0; opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { top: 100%; opacity: 0; }
-        }
-
+        #scan-guide.success { border-color: #2ecc71; transform: translate(-50%, -50%) scale(1.05); }
         .scan-msg {
             position: absolute; top: 10%; left: 0; width: 100%;
             text-align: center; color: white; font-weight: bold; text-shadow: 0 1px 3px #000;
@@ -122,29 +125,45 @@
             cursor: pointer; z-index: 2001;
         }
 
-        /* 属性表示ポップアップ */
-        #feature-info {
-            position: fixed; bottom: -60%; left: 0; width: 100%; height: 50%;
-            background: white; z-index: 100;
+        /* リストパネル & 属性パネル (Bottom Sheet) */
+        #list-panel, #feature-info {
+            bottom: 0; left: 0; width: 100%; height: 50%;
+            background: white; 
             border-top-left-radius: 20px; border-top-right-radius: 20px;
             box-shadow: 0 -5px 20px rgba(0,0,0,0.2);
-            transition: bottom 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
-            display: flex; flex-direction: column;
+            flex-direction: column;
+            transform: translateY(100%); /* 初期状態は下に隠す */
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex; /* flex指定に戻す */
         }
-        #feature-info.open { bottom: 0; }
-        .info-header {
+        #list-panel.open, #feature-info.open { transform: translateY(0); }
+        
+        .panel-header {
             padding: 15px 20px; border-bottom: 1px solid #eee; font-weight: bold;
             display: flex; justify-content: space-between; align-items: center;
             background: #f8f9fa; border-top-left-radius: 20px; border-top-right-radius: 20px;
             color: #2c3e50;
         }
-        .info-content { flex: 1; overflow-y: auto; padding: 15px; padding-bottom: 80px; }
+        .panel-content { flex: 1; overflow-y: auto; padding: 0; padding-bottom: 80px; }
+
+        /* データリストのスタイル */
+        .data-list { list-style: none; padding: 0; margin: 0; }
+        .data-item {
+            padding: 12px 20px; border-bottom: 1px solid #f0f0f0;
+            display: flex; justify-content: space-between; align-items: center;
+            cursor: pointer;
+        }
+        .data-item:active { background: #f5f5f5; }
+        .data-title { font-weight: bold; font-size: 14px; color: #333; }
+        .data-sub { font-size: 11px; color: #888; margin-top: 2px; }
+        .data-icon { color: #3498db; }
+
+        /* テーブルスタイル */
         table { width: 100%; border-collapse: collapse; font-size: 14px; }
-        th, td { padding: 10px 5px; border-bottom: 1px solid #eee; text-align: left; }
-        th { color: #7f8c8d; width: 35%; font-weight: normal; font-size: 12px; }
+        th, td { padding: 10px 20px; border-bottom: 1px solid #eee; text-align: left; }
+        th { color: #7f8c8d; width: 30%; font-weight: normal; font-size: 12px; }
         td { color: #2c3e50; font-weight: 500; }
 
-        /* 読み込み中表示 */
         #loading { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.7); color:white; padding:15px; border-radius:5px; z-index:9999; }
     </style>
 </head>
@@ -157,16 +176,19 @@
 
 <div id="map"></div>
 
+<!-- FABs -->
+<button class="fab fab-map" onclick="toggleMapType()" title="地図切替">
+    <i class="fas fa-layer-group"></i>
+</button>
+<button class="fab fab-gps" id="gps-btn" onclick="toggleGPS()" title="現在地">
+    <i class="fas fa-location-arrow"></i>
+</button>
+
 <!-- ボトムナビゲーション -->
 <div class="bottom-nav">
-    <button class="nav-btn" onclick="document.getElementById('file-input').click()" title="ファイル読込">
+    <button class="nav-btn" onclick="document.getElementById('file-input').click()" title="ファイル">
         <i class="fas fa-folder-open"></i>
         <span>ファイル</span>
-    </button>
-    
-    <button class="nav-btn" onclick="toggleMapType()" title="地図切替">
-        <i class="fas fa-layer-group"></i>
-        <span>地図</span>
     </button>
     
     <div class="scan-btn-wrapper">
@@ -175,9 +197,9 @@
         </button>
     </div>
 
-    <button class="nav-btn" id="gps-btn" onclick="toggleGPS()" title="現在地">
-        <i class="fas fa-location-arrow"></i>
-        <span>現在地</span>
+    <button class="nav-btn" onclick="toggleListPanel()" title="リスト">
+        <i class="fas fa-list-ul"></i>
+        <span>リスト</span>
     </button>
 </div>
 
@@ -192,13 +214,26 @@
     <button class="close-scan" onclick="stopScan()">閉じる</button>
 </div>
 
+<!-- データリストパネル -->
+<div id="list-panel">
+    <div class="panel-header">
+        <span><i class="fas fa-list"></i> 地物一覧</span>
+        <i class="fas fa-times" onclick="toggleListPanel(false)" style="padding:5px 10px; cursor:pointer; font-size:18px; color:#95a5a6;"></i>
+    </div>
+    <div class="panel-content">
+        <ul id="feature-list" class="data-list">
+            <li style="padding:20px; text-align:center; color:#999;">データがありません</li>
+        </ul>
+    </div>
+</div>
+
 <!-- 属性情報パネル -->
 <div id="feature-info">
-    <div class="info-header">
-        <span><i class="fas fa-info-circle"></i> 地物情報</span>
+    <div class="panel-header">
+        <span><i class="fas fa-info-circle"></i> 詳細情報</span>
         <i class="fas fa-times" onclick="closeInfo()" style="padding:5px 10px; cursor:pointer; font-size:18px; color:#95a5a6;"></i>
     </div>
-    <div class="info-content" id="info-table"></div>
+    <div class="panel-content" id="info-table"></div>
 </div>
 
 <div id="loading"><i class="fas fa-spinner fa-spin"></i> 処理中...</div>
@@ -259,36 +294,35 @@
         reader.onload = function(ev) {
             try {
                 if (file.name.match(/\.zip$/i)) {
-                    shp(ev.target.result).then(geojson => {
-                        addGeoJSONFeatures(geojson);
-                        document.getElementById('loading').style.display = 'none';
-                    }).catch(err => { throw new Error("ZIP解析失敗: " + err); });
+                    shp(ev.target.result).then(geojson => { addGeoJSONFeatures(geojson); finishImport(); })
+                    .catch(err => { throw new Error("ZIP解析失敗: " + err); });
                 } else if (file.name.match(/\.json$|\.geojson$/i)) {
-                    const json = JSON.parse(ev.target.result);
-                    addGeoJSONFeatures(json);
-                    document.getElementById('loading').style.display = 'none';
+                    addGeoJSONFeatures(JSON.parse(ev.target.result)); finishImport();
                 } else if (file.name.match(/\.kml$/i)) {
                     const features = new ol.format.KML({extractStyles:false}).readFeatures(ev.target.result, {featureProjection:'EPSG:3857'});
                     if (features.length > 0) {
                         vectorSource.addFeatures(features);
                         map.getView().fit(vectorSource.getExtent(), { padding: [50, 50, 50, 50], duration: 1000 });
                         updateStatus(features.length);
+                        refreshList(); // リスト更新
                     }
-                    document.getElementById('loading').style.display = 'none';
+                    finishImport();
                 } else {
                     alert("未対応のファイル形式です");
-                    document.getElementById('loading').style.display = 'none';
+                    finishImport();
                 }
             } catch (err) {
                 alert("読み込みエラー: " + err.message);
-                document.getElementById('loading').style.display = 'none';
+                finishImport();
             }
         };
 
-        if (file.name.match(/\.zip$/i)) { reader.readAsArrayBuffer(file); } 
-        else { reader.readAsText(file); }
+        if (file.name.match(/\.zip$/i)) reader.readAsArrayBuffer(file);
+        else reader.readAsText(file);
         this.value = '';
     });
+
+    function finishImport() { document.getElementById('loading').style.display = 'none'; }
 
     function addGeoJSONFeatures(json) {
         const features = new ol.format.GeoJSON().readFeatures(json, { featureProjection: 'EPSG:3857' });
@@ -296,6 +330,7 @@
             vectorSource.addFeatures(features);
             map.getView().fit(vectorSource.getExtent(), { padding: [50, 50, 50, 50], duration: 1000 });
             updateStatus(features.length);
+            refreshList(); // リスト更新
             alert(`${features.length}件のデータを読み込みました`);
         } else { alert("有効な地物がありません"); }
     }
@@ -304,7 +339,70 @@
         document.getElementById('layer-count').textContent = `地物数: ${vectorSource.getFeatures().length}`;
     }
 
-    // --- QRスキャンロジック (改善版) ---
+    // --- データリスト機能 ---
+    function toggleListPanel(show) {
+        const panel = document.getElementById('list-panel');
+        if (show === undefined) panel.classList.toggle('open');
+        else if (show) panel.classList.add('open');
+        else panel.classList.remove('open');
+        
+        if (panel.classList.contains('open')) refreshList();
+    }
+
+    function refreshList() {
+        const list = document.getElementById('feature-list');
+        list.innerHTML = "";
+        const features = vectorSource.getFeatures();
+        
+        if (features.length === 0) {
+            list.innerHTML = '<li style="padding:20px; text-align:center; color:#999;">データがありません</li>';
+            return;
+        }
+
+        // 地物リスト生成 (上限100件)
+        features.slice(0, 100).forEach((f, index) => {
+            const props = f.getProperties();
+            // 代表的な属性を探す (林班、ID、名称など)
+            let title = `地物 ${index + 1}`;
+            let sub = "";
+            const keys = Object.keys(props).filter(k => k!=='geometry' && k!=='style');
+            
+            // 優先キー検索
+            const titleKey = keys.find(k => k.match(/林班|名称|NAME|ID|NO/i));
+            if (titleKey) {
+                title = props[titleKey];
+                // サブ情報 (別の属性があれば)
+                const subKey = keys.find(k => k !== titleKey && k.match(/小班|SUB|AREA|面積/i));
+                if (subKey) sub = `${subKey}: ${props[subKey]}`;
+            }
+
+            const li = document.createElement('li');
+            li.className = 'data-item';
+            li.innerHTML = `
+                <div>
+                    <div class="data-title">${title}</div>
+                    ${sub ? `<div class="data-sub">${sub}</div>` : ''}
+                </div>
+                <div class="data-icon"><i class="fas fa-search-location"></i></div>
+            `;
+            li.onclick = () => {
+                const extent = f.getGeometry().getExtent();
+                map.getView().fit(extent, { padding: [100, 50, 50, 50], duration: 800 });
+                toggleListPanel(false);
+                setTimeout(() => showFeatureInfo(f), 800); // ズーム後に詳細表示
+            };
+            list.appendChild(li);
+        });
+        
+        if (features.length > 100) {
+            const li = document.createElement('li');
+            li.style.padding = '15px'; li.style.textAlign = 'center'; li.style.color = '#999';
+            li.textContent = `他 ${features.length - 100} 件...`;
+            list.appendChild(li);
+        }
+    }
+
+    // --- QRスキャンロジック ---
     const video = document.getElementById('scan-video');
     const canvas = document.getElementById('scan-canvas');
     const ctx = canvas.getContext('2d');
@@ -317,25 +415,12 @@
             alert("カメラにはHTTPSが必要です"); return;
         }
         document.getElementById('scan-modal').style.display = 'flex';
-        scanGuide.classList.remove('success'); // ガイドリセット
+        scanGuide.classList.remove('success');
         
-        // 修正: 解像度を上げて細かいQRに対応
-        const constraints = {
-            video: {
-                facingMode: "environment",
-                width: { ideal: 1280 } 
-            }
-        };
-
+        const constraints = { video: { facingMode: "environment", width: { ideal: 1280 } } };
         navigator.mediaDevices.getUserMedia(constraints).then(function(stream) {
-            video.srcObject = stream;
-            video.setAttribute("playsinline", true);
-            video.play();
-            requestAnimationFrame(tick);
-        }).catch(err => {
-            alert("カメラ起動失敗: " + err);
-            stopScan();
-        });
+            video.srcObject = stream; video.setAttribute("playsinline", true); video.play(); requestAnimationFrame(tick);
+        }).catch(err => { alert("カメラ起動失敗: " + err); stopScan(); });
     }
 
     function stopScan() {
@@ -346,23 +431,13 @@
 
     function tick() {
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            canvas.height = video.videoHeight;
-            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight; canvas.width = video.videoWidth;
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-
             if (code) {
-                // 成功フィードバック (緑枠 + バイブ)
-                scanGuide.classList.add('success');
-                if (navigator.vibrate) navigator.vibrate(200);
-                
-                // 少し待ってから処理 (フィードバックを見せるため)
-                setTimeout(() => {
-                    stopScan();
-                    handleScannedData(code.data);
-                }, 300);
+                scanGuide.classList.add('success'); if (navigator.vibrate) navigator.vibrate(200);
+                setTimeout(() => { stopScan(); handleScannedData(code.data); }, 300);
                 return;
             }
         }
@@ -380,14 +455,8 @@
                 qrBuffer.parts[index - 1] = chunk;
                 const receivedCount = qrBuffer.parts.filter(p => p !== null).length;
                 if (receivedCount === total) { processGeoJSON(qrBuffer.parts.join("")); qrBuffer = { total: 0, parts: [] }; } 
-                else { 
-                    alert(`${index}/${total} 読込完了。\n残り${total - receivedCount}枚。\nOKを押して次をスキャンしてください。`); 
-                    startScan(); // 連続スキャン
-                }
-            } else { 
-                alert(`このQR(${index}/${total})は読込済みです。\n別のQRをスキャンしてください。`); 
-                startScan(); 
-            }
+                else { alert(`${index}/${total} 読込完了。\n残り${total - receivedCount}枚。\nOKを押して次をスキャンしてください。`); startScan(); }
+            } else { alert(`このQR(${index}/${total})は読込済みです。\n別のQRをスキャンしてください。`); startScan(); }
             return;
         }
         processGeoJSON(data);
