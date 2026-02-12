@@ -163,7 +163,7 @@
             padding: 10px 30px; background: rgba(255,255,255,0.2); border: 2px solid white; color: white; border-radius: 30px; font-weight: bold; cursor: pointer; z-index: 2001;
         }
 
-        #loading { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.7); color:white; padding:15px; border-radius:5px; z-index:9999; }
+        #loading { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.8); color:white; padding:20px; border-radius:8px; z-index:9999; font-weight:bold; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
         #file-input { display: none; }
     </style>
 </head>
@@ -582,58 +582,104 @@ const Importer = (function() {
         }
     }
     
-    // GeoTIFF logic separated for reuse
+    // PC版と同等の強力なGeoTIFF解析ロジック
     async function handleGeoTIFF(file) {
         try {
-            // geotiff.js logic
             const tiff = await GeoTIFF.fromBlob(file);
             const image = await tiff.getImage();
-            const width = image.getWidth(); const height = image.getHeight();
+            const width = image.getWidth(); 
+            const height = image.getHeight();
             const rasters = await image.readRasters();
             
-            const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
-            const ctx = canvas.getContext('2d'); const imageData = ctx.createImageData(width, height);
+            const canvas = document.createElement('canvas'); 
+            canvas.width = width; 
+            canvas.height = height;
+            const ctx = canvas.getContext('2d'); 
+            const imageData = ctx.createImageData(width, height);
             
-            // Loop optimized
-            const r0 = rasters[0], r1 = rasters[1], r2 = rasters[2];
-            const isRGB = rasters.length >= 3;
-            const data = imageData.data;
-            
-            for (let i = 0, j = 0; i < width * height; i++, j+=4) {
-                if (isRGB) {
-                    data[j] = r0[i]; data[j+1] = r1[i]; data[j+2] = r2[i]; data[j+3] = 255;
-                } else {
-                    const val = r0[i]; data[j] = val; data[j+1] = val; data[j+2] = val; data[j+3] = 255;
+            // Loop optimized for handling Alpha properly
+            for (let i = 0; i < width * height; i++) {
+                if (rasters.length >= 3) { 
+                    imageData.data[i * 4] = rasters[0][i]; 
+                    imageData.data[i * 4 + 1] = rasters[1][i]; 
+                    imageData.data[i * 4 + 2] = rasters[2][i]; 
+                    imageData.data[i * 4 + 3] = (rasters.length >= 4) ? rasters[3][i] : 255; 
+                } else { 
+                    const val = rasters[0][i]; 
+                    imageData.data[i * 4] = val; 
+                    imageData.data[i * 4 + 1] = val; 
+                    imageData.data[i * 4 + 2] = val; 
+                    imageData.data[i * 4 + 3] = (rasters.length >= 2) ? rasters[1][i] : 255; 
                 }
             }
             ctx.putImageData(imageData, 0, 0);
 
-            // Ask EPSG
-            let epsg = "EPSG:6677"; 
-            const userSys = prompt("座標系を入力してください (例: 6677)\n9系:6677, 10系:6678", "6677");
-            if (userSys) epsg = "EPSG:" + userSys;
+            // 1. Get BoundingBox (supports affine transforms like QGIS output)
+            let bbox = image.getBoundingBox();
+            let extent = null;
+            
+            // 2. Fallback
+            if (!bbox) {
+                const tiepoint = image.getTiePoints() ? image.getTiePoints()[0] : null; 
+                const pixelScale = image.getFileDirectory().ModelPixelScale;
+                if (tiepoint && pixelScale) {
+                    const minX = tiepoint.x; const maxY = tiepoint.y; 
+                    const maxX = minX + width * pixelScale[0]; const minY = maxY - height * pixelScale[1];
+                    bbox = [minX, minY, maxX, maxY];
+                }
+            }
 
-            const tiepoint = image.getTiePoints()[0];
-            const pixelScale = image.getFileDirectory().ModelPixelScale;
-
-            if (tiepoint && pixelScale) {
-                const minX = tiepoint.x; const maxY = tiepoint.y;
-                const maxX = minX + width * pixelScale[0]; const minY = maxY - height * pixelScale[1];
-                const trans = proj4(epsg, 'EPSG:3857').forward;
-                const minXY = trans([minX, minY]); const maxXY = trans([maxX, maxY]);
-                const extent = [minXY[0], minXY[1], maxXY[0], maxXY[1]];
+            if (bbox) {
+                let minX = bbox[0], minY = bbox[1], maxX = bbox[2], maxY = bbox[3];
                 
+                // 3. Auto detect EPSG from GeoKeys
+                const geoKeys = image.getGeoKeys();
+                let epsg = null;
+                if (geoKeys && geoKeys.ProjectedCSTypeGeoKey) {
+                    epsg = 'EPSG:' + geoKeys.ProjectedCSTypeGeoKey;
+                } else if (geoKeys && geoKeys.GeographicTypeGeoKey) {
+                    epsg = 'EPSG:' + geoKeys.GeographicTypeGeoKey;
+                }
+                
+                // 4. Ask user if unknown
+                if (!epsg) {
+                    const userSys = prompt("TIFF内部に座標系情報が見つかりませんでした。\nEPSGコードの数値部分を入力してください。\n(例: 日本測地系 9系なら 6677, WGS84なら 4326)", "6677");
+                    if (userSys) epsg = "EPSG:" + userSys;
+                    else { alert("座標系が指定されなかったため読込を中止しました。"); finish(); return; }
+                }
+
+                // 5. Transform Coordinate to Web Mercator (EPSG:3857)
+                if (epsg === 'EPSG:3857') {
+                    extent = [minX, minY, maxX, maxY];
+                } else {
+                    if (!proj4.defs(epsg)) {
+                        console.warn("TIFFの座標系が未定義:", epsg);
+                        extent = [minX, minY, maxX, maxY]; 
+                    } else {
+                        const trans = proj4(epsg, 'EPSG:3857').forward; 
+                        const minXY = trans([minX, minY]); 
+                        const maxXY = trans([maxX, maxY]);
+                        extent = [Math.min(minXY[0], maxXY[0]), Math.min(minXY[1], maxXY[1]), Math.max(minXY[0], maxXY[0]), Math.max(minXY[1], maxXY[1])];
+                    }
+                }
+
                 const newLayer = new ol.layer.Image({
                     source: new ol.source.ImageStatic({ url: canvas.toDataURL(), imageExtent: extent, projection: 'EPSG:3857' }),
-                    opacity: 0.7, zIndex: 10
+                    opacity: 0.7, zIndex: 10 // Above base map(0), below vectors(1000)
                 });
                 
                 AppMap.addLayer(newLayer, file.name, 'raster');
                 AppMap.zoomTo(extent);
-            } else { alert("位置情報なし"); }
+            } else { 
+                alert("GeoTIFFから位置情報を読み取れませんでした。"); 
+            }
             finish();
 
-        } catch(e) { alert("GeoTIFFエラー: " + e.message); finish(); }
+        } catch(e) { 
+            console.error(e);
+            alert("GeoTIFFエラー: " + e.message); 
+            finish(); 
+        }
     }
 
     return { handleFile, loadGeoJSON };
